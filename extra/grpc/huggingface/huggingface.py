@@ -18,7 +18,6 @@ class BackendServicer(backend_pb2_grpc.BackendServicer):
         return backend_pb2.Reply(message=bytes("OK", 'utf-8'))
     def LoadModel(self, request, context):
         model_name = request.Model
-        model_name = os.path.basename(model_name)
         try:
             self.model = SentenceTransformer(model_name)
         except Exception as err:
