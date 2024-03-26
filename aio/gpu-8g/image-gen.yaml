@@ -20,7 +20,6 @@ usage: |
           -H "Content-Type: application/json" \
           -d '{
             "prompt": "<positive prompt>|<negative prompt>",
-            "model": "dreamshaper",
             "step": 25,
             "size": "512x512"
           }'
