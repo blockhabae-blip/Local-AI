@@ -1,50 +1,34 @@
 #!/bin/bash
 set -ex
 
-SKIP_CONDA=${SKIP_CONDA:-0}
+BUILD_ISOLATION_FLAG=""
 
-# Check if environment exist
-conda_env_exists(){
-    ! conda list --name "${@}" >/dev/null 2>/dev/null
-}
+MY_DIR="$(dirname -- "${BASH_SOURCE[0]}")"
 
-if [ $SKIP_CONDA -eq 1 ]; then
-    echo "Skipping conda environment installation"
-else
-    export PATH=$PATH:/opt/conda/bin
-    if conda_env_exists "diffusers" ; then
-        echo "Creating virtual environment..."
-        conda env create --name diffusers --file $1
-        echo "Virtual environment created."
-    else 
-        echo "Virtual environment already exists."
-    fi
+uv venv ${MY_DIR}/venv
+source ${MY_DIR}/venv/bin/activate
+
+if [ -f "requirements-install.txt" ]; then
+    # If we have a requirements-install.txt, it means that a package does not properly declare it's build time
+    # dependencies per PEP-517, so we have to set up the proper build environment ourselves, and then install
+    # the package without build isolation
+    BUILD_ISOLATION_FLAG="--no-build-isolation"
+    uv pip install --requirement ${MY_DIR}/requirements-install.txt
+fi
+uv pip install ${BUILD_ISOLATION_FLAG} --requirement ${MY_DIR}/requirements.txt
+
+if [ -f "requirements-${BUILD_TYPE}.txt" ]; then
+    uv pip install ${BUILD_ISOLATION_FLAG}  --requirement ${MY_DIR}/requirements-${BUILD_TYPE}.txt
 fi
 
 if [ -d "/opt/intel" ]; then
     # Intel GPU: If the directory exists, we assume we are using the Intel image
     # https://github.com/intel/intel-extension-for-pytorch/issues/538
-    pip install torch==2.1.0a0 \
-                torchvision==0.16.0a0 \
-                torchaudio==2.1.0a0 \
-                intel-extension-for-pytorch==2.1.10+xpu \
-                --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
-    
-    pip install google-api-python-client \
-                grpcio==1.63.0 \
-                grpcio-tools==1.63.0 \
-                diffusers==0.24.0 \
-                transformers>=4.25.1 \
-                accelerate \
-                compel==2.0.2 \
-                Pillow
+    if [ -f "requirements-intel.txt" ]; then
+        uv pip install ${BUILD_ISOLATION_FLAG}  --index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ --requirement ${MY_DIR}/requirements-intel.txt
+    fi
 fi
 
 if [ "$PIP_CACHE_PURGE" = true ] ; then
-    if [ $SKIP_CONDA -ne 1 ]; then
-        # Activate conda environment
-        source activate diffusers
-    fi
-
     pip cache purge
 fi
