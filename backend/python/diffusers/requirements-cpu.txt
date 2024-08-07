@@ -1,0 +1,8 @@
+diffusers
+opencv-python
+transformers
+accelerate
+compel
+peft
+sentencepiece
+torch

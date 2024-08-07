@@ -1,2 +1,4 @@
+accelerate
 torch
-flash-attn
+transformers
+vllm
