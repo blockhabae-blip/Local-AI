@@ -31,6 +31,7 @@ jobs:
       llama-cpp-quantization: ${{ steps.detect.outputs.llama-cpp-quantization }}
       acestep-cpp: ${{ steps.detect.outputs.acestep-cpp }}
       voxtral: ${{ steps.detect.outputs.voxtral }}
+      kokoros: ${{ steps.detect.outputs.kokoros }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -528,3 +529,25 @@ jobs:
       - name: Test voxtral
         run: |
           make --jobs=5 --output-sync=target -C backend/go/voxtral test
+  tests-kokoros:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.kokoros == 'true' || needs.detect-changes.outputs.run-all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config protobuf-compiler clang libclang-dev
+          sudo apt-get install -y espeak-ng libespeak-ng-dev libsonic-dev libpcaudio-dev libopus-dev libssl-dev
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Build kokoros
+        run: |
+          make -C backend/rust/kokoros kokoros-grpc
+      - name: Test kokoros
+        run: |
+          make -C backend/rust/kokoros test

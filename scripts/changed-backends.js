@@ -21,6 +21,9 @@ function inferBackendPath(item) {
   if (item.dockerfile.endsWith("golang")) {
     return `backend/go/${item.backend}/`;
   }
+  if (item.dockerfile.endsWith("rust")) {
+    return `backend/rust/${item.backend}/`;
+  }
   if (item.dockerfile.endsWith("llama-cpp")) {
     return `backend/cpp/llama-cpp/`;
   }
