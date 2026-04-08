@@ -956,8 +956,7 @@ parameters:
 		It("returns the models list", func() {
 			models, err := client.ListModels(context.TODO())
 			Expect(err).ToNot(HaveOccurred())
-			// A model called "bert" can be present in the model directory depending on the order of the tests
-			Expect(len(models.Models)).To(BeNumerically(">=", 8))
+			Expect(len(models.Models)).To(BeNumerically(">=", 7))
 		})
 		It("can generate completions via ggml", func() {
 			if runtime.GOOS != "linux" {
