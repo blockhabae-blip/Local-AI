@@ -27,6 +27,134 @@
     - filename: llama-cpp/models/gemma-4-26B-A4B-it-APEX-GGUF/gemma-4-26B-A4B-APEX-Quality.gguf
       uri: https://huggingface.co/mudler/gemma-4-26B-A4B-it-APEX-GGUF/resolve/main/gemma-4-26B-A4B-APEX-Quality.gguf
       sha256: a6591d7b41978e6f465acd9d03e96286f70912402c695158fb267ccbfbb740ed
+- &gemma4
+  url: "github:mudler/LocalAI/gallery/virtual.yaml@master"
+  name: "gemma-4-26b-a4b-it"
+  icon: https://ai.google.dev/static/gemma/images/gemma3.png
+  license: gemma
+  urls:
+    - https://huggingface.co/google/gemma-4-26B-A4B-it
+    - https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF
+  description: |
+    Google Gemma 4 26B-A4B-IT is an open-source multimodal Mixture-of-Experts model with 26B total parameters and 4B active parameters. It handles text and image input, generating text output, with a 256K context window and support for 140+ languages. The MoE architecture provides strong performance with efficient inference. Well-suited for question answering, summarization, reasoning, and image understanding tasks.
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - cpu
+    - gemma
+    - gemma4
+    - gemma-4
+    - multimodal
+  overrides:
+    backend: llama-cpp
+    function:
+      automatic_tool_parsing_fallback: true
+      grammar:
+        disable: true
+    known_usecases:
+      - chat
+    mmproj: mmproj-gemma-4-26B-A4B-it-f16.gguf
+    options:
+      - use_jinja:true
+    parameters:
+      model: gemma-4-26B-A4B-it-Q4_K_M.gguf
+    template:
+      use_tokenizer_template: true
+  files:
+    - filename: gemma-4-26B-A4B-it-Q4_K_M.gguf
+      sha256: 23c6997912cb7fa36147fe05877de73ddbb2a80ff69b18ff171b354dccf2b5b5
+      uri: huggingface://ggml-org/gemma-4-26B-A4B-it-GGUF/gemma-4-26B-A4B-it-Q4_K_M.gguf
+    - filename: mmproj-gemma-4-26B-A4B-it-f16.gguf
+      sha256: 4107c1c3c299095fbc323f87f4e4cac81dd9527db5ff90808fea669e08244531
+      uri: huggingface://ggml-org/gemma-4-26B-A4B-it-GGUF/mmproj-gemma-4-26B-A4B-it-f16.gguf
+- !!merge <<: *gemma4
+  name: "gemma-4-e2b-it"
+  urls:
+    - https://huggingface.co/google/gemma-4-E2B-it
+    - https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF
+  description: |
+    Google Gemma 4 E2B-IT is a lightweight open-source multimodal model with 5B total parameters and 2B effective parameters using selective parameter activation. It handles text and image input, generating text output, with a 256K context window and support for 140+ languages. Optimized for efficient execution on low-resource devices including mobile and laptops.
+  overrides:
+    backend: llama-cpp
+    function:
+      automatic_tool_parsing_fallback: true
+      grammar:
+        disable: true
+    known_usecases:
+      - chat
+    mmproj: mmproj-gemma-4-e2b-it-f16.gguf
+    options:
+      - use_jinja:true
+    parameters:
+      model: gemma-4-e2b-it-Q8_0.gguf
+    template:
+      use_tokenizer_template: true
+  files:
+    - filename: gemma-4-e2b-it-Q8_0.gguf
+      sha256: 12d878964d21f1779dea15abeee048855151b27089fe98b32c628f85740933f3
+      uri: huggingface://ggml-org/gemma-4-E2B-it-GGUF/gemma-4-e2b-it-Q8_0.gguf
+    - filename: mmproj-gemma-4-e2b-it-f16.gguf
+      sha256: 9165f3d9674c3731ae29373d95b860d141eee030b0ec0bf4577e2de8596a7767
+      uri: huggingface://ggml-org/gemma-4-E2B-it-GGUF/mmproj-gemma-4-e2b-it-f16.gguf
+- !!merge <<: *gemma4
+  name: "gemma-4-e4b-it"
+  urls:
+    - https://huggingface.co/google/gemma-4-E4B-it
+    - https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF
+  description: |
+    Google Gemma 4 E4B-IT is an open-source multimodal model with 8B total parameters and 4B effective parameters using selective parameter activation. It handles text and image input, generating text output, with a 256K context window and support for 140+ languages. Offers a good balance of performance and efficiency for deployment on consumer hardware.
+  overrides:
+    backend: llama-cpp
+    function:
+      automatic_tool_parsing_fallback: true
+      grammar:
+        disable: true
+    known_usecases:
+      - chat
+    mmproj: mmproj-gemma-4-e4b-it-f16.gguf
+    options:
+      - use_jinja:true
+    parameters:
+      model: gemma-4-e4b-it-Q4_K_M.gguf
+    template:
+      use_tokenizer_template: true
+  files:
+    - filename: gemma-4-e4b-it-Q4_K_M.gguf
+      sha256: dff4e4ca848e33e678a63b5b7d1f8bfa4a17e764415d0c0aaaad07c84f4d8fad
+      uri: huggingface://ggml-org/gemma-4-E4B-it-GGUF/gemma-4-e4b-it-Q4_K_M.gguf
+    - filename: mmproj-gemma-4-e4b-it-f16.gguf
+      sha256: a7e94f39cee4569fae49c852cbfb574c54e225aafb8b75313a8bf06b89e17712
+      uri: huggingface://ggml-org/gemma-4-E4B-it-GGUF/mmproj-gemma-4-e4b-it-f16.gguf
+- !!merge <<: *gemma4
+  name: "gemma-4-31b-it"
+  urls:
+    - https://huggingface.co/google/gemma-4-31B-it
+    - https://huggingface.co/unsloth/gemma-4-31B-it-GGUF
+  description: |
+    Google Gemma 4 31B-IT is the largest dense model in the Gemma 4 family with 31B parameters. It handles text and image input, generating text output, with a 256K context window and support for 140+ languages. Provides the highest quality outputs in the Gemma 4 lineup, well-suited for complex reasoning, summarization, and image understanding tasks.
+  overrides:
+    backend: llama-cpp
+    function:
+      automatic_tool_parsing_fallback: true
+      grammar:
+        disable: true
+    known_usecases:
+      - chat
+    mmproj: mmproj-F16.gguf
+    options:
+      - use_jinja:true
+    parameters:
+      model: gemma-4-31B-it-Q4_K_M.gguf
+    template:
+      use_tokenizer_template: true
+  files:
+    - filename: gemma-4-31B-it-Q4_K_M.gguf
+      sha256: 5783acab7217360984ea957abc36f89d35cdeba2f5dd30b0e9e33f9f294bad82
+      uri: huggingface://unsloth/gemma-4-31B-it-GGUF/gemma-4-31B-it-Q4_K_M.gguf
+    - filename: mmproj-F16.gguf
+      sha256: 1be2a32013e0d29c6c746513b5f5e7d38f47b694351e74a69c7172acdbbb11a6
+      uri: https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/mmproj-F16.gguf
 - name: "qwen3.5-35b-a3b-apex"
   url: "github:mudler/LocalAI/gallery/virtual.yaml@master"
   urls:
