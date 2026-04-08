@@ -438,6 +438,7 @@
     - whisperx
   license: BSD-4-Clause
   name: "whisperx"
+  alias: "whisperx"
   capabilities:
     nvidia: "cuda12-whisperx"
     amd: "rocm-whisperx"
