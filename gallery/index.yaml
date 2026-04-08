@@ -7789,6 +7789,24 @@
     - filename: granite-embedding-125m-english-f16.gguf
       uri: huggingface://bartowski/granite-embedding-125m-english-GGUF/granite-embedding-125m-english-f16.gguf
       sha256: e2950cf0228514e0e81c6f0701a62a9e4763990ce660b4a3c0329cd6a4acd4b9
+- name: "embeddinggemma-300m"
+  url: github:mudler/LocalAI/gallery/virtual.yaml@master
+  urls:
+    - https://huggingface.co/google/embeddinggemma-300m
+    - https://huggingface.co/ggml-org/embeddinggemma-300m-qat-q8_0-GGUF
+  description: |
+    EmbeddingGemma 300M is a lightweight, high-quality embedding model from Google, based on the Gemma architecture. It produces 1024-dimensional embeddings optimized for retrieval and semantic similarity tasks. This GGUF version uses QAT (Quantization-Aware Training) Q8_0 quantization for efficient inference.
+  tags:
+    - embeddings
+  overrides:
+    backend: llama-cpp
+    embeddings: true
+    parameters:
+      model: embeddinggemma-300m-qat-Q8_0.gguf
+  files:
+    - filename: embeddinggemma-300m-qat-Q8_0.gguf
+      uri: huggingface://ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf
+      sha256: 6fa0c02a9c302be6f977521d399b4de3a46310a4f2621ee0063747881b673f67
 - name: "moe-girl-1ba-7bt-i1"
   icon: https://cdn-uploads.huggingface.co/production/uploads/634262af8d8089ebaefd410e/kTXXSSSqpb21rfyOX7FUa.jpeg
   # chatml
