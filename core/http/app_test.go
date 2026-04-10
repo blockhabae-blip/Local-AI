@@ -978,6 +978,42 @@ parameters:
 			Expect(resp.Choices[0].Message.Content).ToNot(BeEmpty())
 		})
 
+		It("does not duplicate the first content token in streaming chat completions", Label("llama-gguf", "llama-gguf-stream"), func() {
+			if runtime.GOOS != "linux" {
+				Skip("test supported only on linux")
+			}
+			stream, err := client.CreateChatCompletionStream(context.TODO(), openai.ChatCompletionRequest{
+				Model:    "testmodel.ggml",
+				Messages: []openai.ChatCompletionMessage{{Role: "user", Content: testPrompt}},
+			})
+			Expect(err).ToNot(HaveOccurred())
+			defer stream.Close()
+
+			var contentParts []string
+			for {
+				chunk, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				Expect(err).ToNot(HaveOccurred())
+				if len(chunk.Choices) > 0 {
+					delta := chunk.Choices[0].Delta.Content
+					if delta != "" {
+						contentParts = append(contentParts, delta)
+					}
+				}
+			}
+
+			Expect(contentParts).ToNot(BeEmpty(), "Expected streaming content tokens")
+			// The first content token should appear exactly once.
+			// A bug in grpc-server.cpp caused the role-init array element
+			// to get the same ChatDelta stamped, duplicating the first token.
+			if len(contentParts) >= 2 {
+				Expect(contentParts[0]).ToNot(Equal(contentParts[1]),
+					"First content token was duplicated: %v", contentParts[:2])
+			}
+		})
+
 		It("returns logprobs in chat completions when requested", func() {
 			if runtime.GOOS != "linux" {
 				Skip("test only on linux")

@@ -1716,12 +1716,23 @@ public:
             }
         };
 
-        // Process first result
+        // Process first result.
+        // When TASK_RESPONSE_TYPE_OAI_CHAT is used, the first token may
+        // produce a JSON array with a role-init element followed by the
+        // actual content element. We must only attach chat deltas to the
+        // content element — attaching to both would duplicate the first
+        // token since oaicompat_msg_diffs is the same for both.
         json first_res_json = first_result->to_json();
         if (first_res_json.is_array()) {
             for (const auto & res : first_res_json) {
                 auto reply = build_reply_from_json(res, first_result.get());
-                attach_chat_deltas(reply, first_result.get());
+                // Skip chat deltas for role-init elements (have "role" in
+                // delta but no content/reasoning diffs of their own).
+                bool is_role_init = res.contains("choices") && !res["choices"].empty() &&
+                                    res["choices"][0].value("delta", json::object()).contains("role");
+                if (!is_role_init) {
+                    attach_chat_deltas(reply, first_result.get());
+                }
                 writer->Write(reply);
             }
         } else {
@@ -1745,7 +1756,11 @@ public:
             if (res_json.is_array()) {
                 for (const auto & res : res_json) {
                     auto reply = build_reply_from_json(res, result.get());
-                    attach_chat_deltas(reply, result.get());
+                    bool is_role_init = res.contains("choices") && !res["choices"].empty() &&
+                                        res["choices"][0].value("delta", json::object()).contains("role");
+                    if (!is_role_init) {
+                        attach_chat_deltas(reply, result.get());
+                    }
                     writer->Write(reply);
                 }
             } else {
