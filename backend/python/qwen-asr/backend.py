@@ -147,7 +147,11 @@ class BackendServicer(backend_pb2_grpc.BackendServicer):
             if request.language and request.language.strip():
                 language = request.language.strip()
 
-            results = self.model.transcribe(audio=audio_path, language=language)
+            context = ""
+            if request.prompt and request.prompt.strip():
+                context = request.prompt.strip()
+
+            results = self.model.transcribe(audio=audio_path, language=language, context=context)
 
             if not results:
                 return backend_pb2.TranscriptResult(segments=[], text="")
