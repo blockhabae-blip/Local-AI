@@ -9,5 +9,6 @@ const (
 	KeyGalleryDedup     int64 = 102
 	KeyAgentScheduler   int64 = 103
 	KeyHealthCheck      int64 = 104
-	KeySchemaMigrate    int64 = 105
+	KeySchemaMigrate        int64 = 105
+	KeyBackendUpgradeCheck  int64 = 106
 )

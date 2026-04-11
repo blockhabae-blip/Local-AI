@@ -37,6 +37,9 @@ type Application struct {
 
 	// Distributed mode services (nil when not in distributed mode)
 	distributed *DistributedServices
+
+	// Upgrade checker (background service for detecting backend upgrades)
+	upgradeChecker *UpgradeChecker
 }
 
 func newApplication(appConfig *config.ApplicationConfig) *Application {
@@ -77,6 +80,19 @@ func (a *Application) GalleryService() *galleryop.GalleryService {
 
 func (a *Application) AgentJobService() *agentpool.AgentJobService {
 	return a.agentJobService
+}
+
+func (a *Application) UpgradeChecker() *UpgradeChecker {
+	return a.upgradeChecker
+}
+
+// distributedDB returns the PostgreSQL database for distributed coordination,
+// or nil in standalone mode.
+func (a *Application) distributedDB() *gorm.DB {
+	if a.distributed != nil {
+		return a.authDB
+	}
+	return nil
 }
 
 func (a *Application) AgentPoolService() *agentpool.AgentPoolService {

@@ -47,6 +47,7 @@ type RunCMD struct {
 	BackendImagesReleaseTag  string   `env:"LOCALAI_BACKEND_IMAGES_RELEASE_TAG,BACKEND_IMAGES_RELEASE_TAG" help:"Fallback release tag for backend images" group:"backends" default:"latest"`
 	BackendImagesBranchTag   string   `env:"LOCALAI_BACKEND_IMAGES_BRANCH_TAG,BACKEND_IMAGES_BRANCH_TAG" help:"Fallback branch tag for backend images" group:"backends" default:"master"`
 	BackendDevSuffix         string   `env:"LOCALAI_BACKEND_DEV_SUFFIX,BACKEND_DEV_SUFFIX" help:"Development suffix for backend images" group:"backends" default:"development"`
+	AutoUpgradeBackends      bool     `env:"LOCALAI_AUTO_UPGRADE_BACKENDS,AUTO_UPGRADE_BACKENDS" help:"Automatically upgrade backends when new versions are detected" group:"backends" default:"false"`
 	PreloadModels            string   `env:"LOCALAI_PRELOAD_MODELS,PRELOAD_MODELS" help:"A List of models to apply in JSON at start" group:"models"`
 	Models                   []string `env:"LOCALAI_MODELS,MODELS" help:"A List of model configuration URLs to load" group:"models"`
 	PreloadModelsConfig      string   `env:"LOCALAI_PRELOAD_MODELS_CONFIG,PRELOAD_MODELS_CONFIG" help:"A List of models to apply at startup. Path to a YAML config file" group:"models"`
@@ -488,6 +489,10 @@ func (r *RunCMD) Run(ctx *cliContext.Context) error {
 
 	if r.AutoloadBackendGalleries {
 		opts = append(opts, config.EnableBackendGalleriesAutoload)
+	}
+
+	if r.AutoUpgradeBackends {
+		opts = append(opts, config.WithAutoUpgradeBackends(r.AutoUpgradeBackends))
 	}
 
 	if r.PreloadBackendOnly {

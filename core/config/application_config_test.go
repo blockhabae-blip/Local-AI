@@ -119,6 +119,13 @@ var _ = Describe("ApplicationConfig RuntimeSettings Conversion", func() {
 			Expect(*rs.AgentJobRetentionDays).To(Equal(30))
 		})
 
+		It("should include auto_upgrade_backends", func() {
+			appConfig := &ApplicationConfig{AutoUpgradeBackends: true}
+			rs := appConfig.ToRuntimeSettings()
+			Expect(rs.AutoUpgradeBackends).ToNot(BeNil())
+			Expect(*rs.AutoUpgradeBackends).To(BeTrue())
+		})
+
 		It("should use default timeouts when not set", func() {
 			appConfig := &ApplicationConfig{}
 
@@ -426,6 +433,14 @@ var _ = Describe("ApplicationConfig RuntimeSettings Conversion", func() {
 			Expect(appConfig.AutoloadBackendGalleries).To(BeTrue())
 		})
 
+		It("should apply auto_upgrade_backends setting", func() {
+			appConfig := &ApplicationConfig{}
+			v := true
+			rs := &RuntimeSettings{AutoUpgradeBackends: &v}
+			appConfig.ApplyRuntimeSettings(rs)
+			Expect(appConfig.AutoUpgradeBackends).To(BeTrue())
+		})
+
 		It("should apply agent settings", func() {
 			appConfig := &ApplicationConfig{}
 
@@ -465,6 +480,7 @@ var _ = Describe("ApplicationConfig RuntimeSettings Conversion", func() {
 				Federated:                true,
 				AutoloadGalleries:        true,
 				AutoloadBackendGalleries: false,
+				AutoUpgradeBackends:      true,
 				AgentJobRetentionDays:    60,
 			}
 
@@ -496,6 +512,7 @@ var _ = Describe("ApplicationConfig RuntimeSettings Conversion", func() {
 			Expect(target.Federated).To(Equal(original.Federated))
 			Expect(target.AutoloadGalleries).To(Equal(original.AutoloadGalleries))
 			Expect(target.AutoloadBackendGalleries).To(Equal(original.AutoloadBackendGalleries))
+			Expect(target.AutoUpgradeBackends).To(Equal(original.AutoUpgradeBackends))
 			Expect(target.AgentJobRetentionDays).To(Equal(original.AgentJobRetentionDays))
 		})
 

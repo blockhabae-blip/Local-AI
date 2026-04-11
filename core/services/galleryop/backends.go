@@ -69,7 +69,9 @@ func (g *GalleryService) backendHandler(op *ManagementOp[gallery.GalleryBackend,
 	}
 
 	var err error
-	if op.Delete {
+	if op.Upgrade {
+		err = g.backendManager.UpgradeBackend(ctx, op.GalleryElementName, progressCallback)
+	} else if op.Delete {
 		err = g.backendManager.DeleteBackend(op.GalleryElementName)
 	} else {
 		err = g.backendManager.InstallBackend(ctx, op, progressCallback)

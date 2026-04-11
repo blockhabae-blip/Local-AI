@@ -49,17 +49,19 @@ func (d *DistributedModelManager) InstallModel(ctx context.Context, op *galleryo
 // DistributedBackendManager wraps a local BackendManager and adds NATS fan-out
 // for backend deletion so worker nodes clean up stale files.
 type DistributedBackendManager struct {
-	local    galleryop.BackendManager
-	adapter  *RemoteUnloaderAdapter
-	registry *NodeRegistry
+	local            galleryop.BackendManager
+	adapter          *RemoteUnloaderAdapter
+	registry         *NodeRegistry
+	backendGalleries []config.Gallery
 }
 
 // NewDistributedBackendManager creates a DistributedBackendManager.
 func NewDistributedBackendManager(appConfig *config.ApplicationConfig, ml *model.ModelLoader, adapter *RemoteUnloaderAdapter, registry *NodeRegistry) *DistributedBackendManager {
 	return &DistributedBackendManager{
-		local:    galleryop.NewLocalBackendManager(appConfig, ml),
-		adapter:  adapter,
-		registry: registry,
+		local:            galleryop.NewLocalBackendManager(appConfig, ml),
+		adapter:          adapter,
+		registry:         registry,
+		backendGalleries: appConfig.BackendGalleries,
 	}
 }
 
@@ -171,4 +173,44 @@ func (d *DistributedBackendManager) InstallBackend(ctx context.Context, op *gall
 		}
 	}
 	return nil
+}
+
+// UpgradeBackend fans out a backend upgrade to all healthy worker nodes.
+// TODO: Add dedicated NATS subject for upgrade (currently reuses install with force flag)
+func (d *DistributedBackendManager) UpgradeBackend(ctx context.Context, name string, progressCb galleryop.ProgressCallback) error {
+	allNodes, err := d.registry.List(context.Background())
+	if err != nil {
+		return err
+	}
+
+	galleriesJSON, _ := json.Marshal(d.backendGalleries)
+	var errs []error
+
+	for _, node := range allNodes {
+		if node.Status != StatusHealthy {
+			continue
+		}
+		// Reuse install endpoint which will re-download the backend (force mode)
+		reply, err := d.adapter.InstallBackend(node.ID, name, "", string(galleriesJSON))
+		if err != nil {
+			if errors.Is(err, nats.ErrNoResponders) {
+				xlog.Warn("No NATS responders for node during upgrade, marking unhealthy", "node", node.Name, "nodeID", node.ID)
+				d.registry.MarkUnhealthy(context.Background(), node.ID)
+				continue
+			}
+			errs = append(errs, fmt.Errorf("node %s: %w", node.Name, err))
+			continue
+		}
+		if !reply.Success {
+			errs = append(errs, fmt.Errorf("node %s: %s", node.Name, reply.Error))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// CheckUpgrades checks for available backend upgrades.
+// Gallery comparison is global (not per-node), so we delegate to the local manager.
+func (d *DistributedBackendManager) CheckUpgrades(ctx context.Context) (map[string]gallery.UpgradeInfo, error) {
+	return d.local.CheckUpgrades(ctx)
 }

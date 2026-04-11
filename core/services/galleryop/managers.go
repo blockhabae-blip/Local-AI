@@ -15,9 +15,11 @@ type ModelManager interface {
 	DeleteModel(name string) error
 }
 
-// BackendManager handles backend install, delete, and listing lifecycle.
+// BackendManager handles backend install, delete, upgrade, and listing lifecycle.
 type BackendManager interface {
 	InstallBackend(ctx context.Context, op *ManagementOp[gallery.GalleryBackend, any], progressCb ProgressCallback) error
 	DeleteBackend(name string) error
 	ListBackends() (gallery.SystemBackends, error)
+	UpgradeBackend(ctx context.Context, name string, progressCb ProgressCallback) error
+	CheckUpgrades(ctx context.Context) (map[string]gallery.UpgradeInfo, error)
 }

@@ -266,6 +266,9 @@ export default function Settings() {
               <SettingRow label="Max Active Backends" description="Maximum models to keep loaded simultaneously (0 = unlimited)">
                 <input className="input" type="number" style={{ width: 120 }} value={settings.max_active_backends ?? ''} onChange={(e) => update('max_active_backends', parseInt(e.target.value) || 0)} placeholder="0" />
               </SettingRow>
+              <SettingRow label="Auto-upgrade Backends" description="Automatically upgrade backends when new versions are detected">
+                <Toggle checked={settings.auto_upgrade_backends} onChange={(v) => update('auto_upgrade_backends', v)} />
+              </SettingRow>
             </div>
           </div>
 

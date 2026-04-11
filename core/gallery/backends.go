@@ -15,6 +15,7 @@ import (
 	"github.com/mudler/LocalAI/core/config"
 	"github.com/mudler/LocalAI/pkg/downloader"
 	"github.com/mudler/LocalAI/pkg/model"
+	"github.com/mudler/LocalAI/pkg/oci"
 	"github.com/mudler/LocalAI/pkg/system"
 	"github.com/mudler/xlog"
 	cp "github.com/otiai10/copy"
@@ -158,6 +159,7 @@ func InstallBackendFromGallery(ctx context.Context, galleries []config.Gallery, 
 			Name:           name,
 			GalleryURL:     backend.Gallery.URL,
 			InstalledAt:    time.Now().Format(time.RFC3339),
+			Version:        bestBackend.Version,
 		}
 
 		if err := writeBackendMetadata(metaBackendPath, metaMetadata); err != nil {
@@ -279,6 +281,18 @@ func InstallBackend(ctx context.Context, systemState *system.SystemState, modelL
 		Name:        name,
 		GalleryURL:  config.Gallery.URL,
 		InstalledAt: time.Now().Format(time.RFC3339),
+		Version:     config.Version,
+		URI:         string(uri),
+	}
+
+	// Record the OCI digest for upgrade detection (non-fatal on failure)
+	if uri.LooksLikeOCI() {
+		digest, digestErr := oci.GetImageDigest(string(uri), "", nil, nil)
+		if digestErr != nil {
+			xlog.Warn("Failed to get OCI image digest for backend", "uri", string(uri), "error", digestErr)
+		} else {
+			metadata.Digest = digest
+		}
 	}
 
 	if config.Alias != "" {
@@ -373,11 +387,13 @@ func DeleteBackendFromSystem(systemState *system.SystemState, name string) error
 }
 
 type SystemBackend struct {
-	Name     string
-	RunFile  string
-	IsMeta   bool
-	IsSystem bool
-	Metadata *BackendMetadata
+	Name             string
+	RunFile          string
+	IsMeta           bool
+	IsSystem         bool
+	Metadata         *BackendMetadata
+	UpgradeAvailable bool   `json:"upgrade_available,omitempty"`
+	AvailableVersion string `json:"available_version,omitempty"`
 }
 
 type SystemBackends map[string]SystemBackend

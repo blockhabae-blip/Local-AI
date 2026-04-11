@@ -22,6 +22,7 @@ export default function Manage() {
   const [backendsLoading, setBackendsLoading] = useState(true)
   const [reloading, setReloading] = useState(false)
   const [reinstallingBackends, setReinstallingBackends] = useState(new Set())
+  const [upgrades, setUpgrades] = useState({})
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [distributedMode, setDistributedMode] = useState(false)
   const [togglingModels, setTogglingModels] = useState(new Set())
@@ -61,6 +62,15 @@ export default function Manage() {
     // Detect distributed mode (nodes API returns 503 when not enabled)
     nodesApi.list().then(() => setDistributedMode(true)).catch(() => {})
   }, [fetchLoadedModels, fetchBackends])
+
+  // Fetch available backend upgrades
+  useEffect(() => {
+    if (activeTab === 'backends') {
+      backendsApi.checkUpgrades()
+        .then(data => setUpgrades(data || {}))
+        .catch(() => {})
+    }
+  }, [activeTab])
 
   const handleStopModel = (modelName) => {
     setConfirmDialog({
@@ -160,6 +170,22 @@ export default function Manage() {
       addToast(`Reinstalling ${name}...`, 'info')
     } catch (err) {
       addToast(`Failed to reinstall: ${err.message}`, 'error')
+    } finally {
+      setReinstallingBackends(prev => {
+        const next = new Set(prev)
+        next.delete(name)
+        return next
+      })
+    }
+  }
+
+  const handleUpgradeBackend = async (name) => {
+    try {
+      setReinstallingBackends(prev => new Set(prev).add(name))
+      await backendsApi.upgrade(name)
+      addToast(`Upgrading ${name}...`, 'info')
+    } catch (err) {
+      addToast(`Failed to upgrade: ${err.message}`, 'error')
     } finally {
       setReinstallingBackends(prev => {
         const next = new Set(prev)
@@ -471,6 +497,17 @@ export default function Manage() {
                             For: <span style={{ color: 'var(--color-accent)' }}>{backend.Metadata.meta_backend_for}</span>
                           </span>
                         )}
+                        {backend.Metadata?.version && (
+                          <span>
+                            <i className="fas fa-code-branch" style={{ fontSize: '0.5rem', marginRight: 4 }} />
+                            Version: <span style={{ color: 'var(--color-text-primary)' }}>v{backend.Metadata.version}</span>
+                            {upgrades[backend.Name] && (
+                              <span style={{ color: '#856404', marginLeft: 4 }}>
+                                → v{upgrades[backend.Name].available_version}
+                              </span>
+                            )}
+                          </span>
+                        )}
                         {backend.Metadata?.installed_at && (
                           <span>
                             <i className="fas fa-calendar" style={{ fontSize: '0.5rem', marginRight: 4 }} />
@@ -485,12 +522,12 @@ export default function Manage() {
                         {!backend.IsSystem ? (
                           <>
                             <button
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => handleReinstallBackend(backend.Name)}
+                              className={`btn ${upgrades[backend.Name] ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                              onClick={() => upgrades[backend.Name] ? handleUpgradeBackend(backend.Name) : handleReinstallBackend(backend.Name)}
                               disabled={reinstallingBackends.has(backend.Name)}
-                              title="Reinstall"
+                              title={upgrades[backend.Name] ? `Upgrade to v${upgrades[backend.Name]?.available_version || 'latest'}` : 'Reinstall'}
                             >
-                              <i className={`fas ${reinstallingBackends.has(backend.Name) ? 'fa-spinner fa-spin' : 'fa-rotate'}`} />
+                              <i className={`fas ${reinstallingBackends.has(backend.Name) ? 'fa-spinner fa-spin' : upgrades[backend.Name] ? 'fa-arrow-up' : 'fa-rotate'}`} />
                             </button>
                             <button
                               className="btn btn-danger btn-sm"

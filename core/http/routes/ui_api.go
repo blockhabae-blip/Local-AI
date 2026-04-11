@@ -929,6 +929,7 @@ func RegisterUIAPIRoutes(app *echo.Echo, cl *config.ModelConfigLoader, ml *model
 				"tags":        b.Tags,
 				"gallery":     b.Gallery.Name,
 				"installed":   b.Installed,
+				"version":     b.Version,
 				"processing":  currentlyProcessing,
 				"jobID":       jobID,
 				"isDeletion":  isDeletionOp,
@@ -1191,6 +1192,49 @@ func RegisterUIAPIRoutes(app *echo.Echo, cl *config.ModelConfigLoader, ml *model
 		return c.JSON(200, map[string]any{
 			"success": true,
 			"message": "Backend deleted successfully",
+		})
+	}, adminMiddleware)
+
+	// Backend upgrade APIs
+	app.GET("/api/backends/upgrades", func(c echo.Context) error {
+		if applicationInstance == nil || applicationInstance.UpgradeChecker() == nil {
+			return c.JSON(200, map[string]any{})
+		}
+		return c.JSON(200, applicationInstance.UpgradeChecker().GetAvailableUpgrades())
+	}, adminMiddleware)
+
+	app.POST("/api/backends/upgrades/check", func(c echo.Context) error {
+		if applicationInstance == nil || applicationInstance.UpgradeChecker() == nil {
+			return c.JSON(200, map[string]any{})
+		}
+		applicationInstance.UpgradeChecker().TriggerCheck()
+		return c.JSON(200, applicationInstance.UpgradeChecker().GetAvailableUpgrades())
+	}, adminMiddleware)
+
+	app.POST("/api/backends/upgrade/:name", func(c echo.Context) error {
+		backendName := c.Param("name")
+		backendName, err := url.QueryUnescape(backendName)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]any{
+				"error": "invalid backend name",
+			})
+		}
+
+		uid, err := uuid.NewUUID()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		}
+
+		galleryService.BackendGalleryChannel <- galleryop.ManagementOp[gallery.GalleryBackend, any]{
+			ID:                 uid.String(),
+			GalleryElementName: backendName,
+			Galleries:          appConfig.BackendGalleries,
+			Upgrade:            true,
+		}
+
+		return c.JSON(200, map[string]any{
+			"uuid":      uid.String(),
+			"statusUrl": fmt.Sprintf("/api/backends/job/%s", uid.String()),
 		})
 	}, adminMiddleware)
 

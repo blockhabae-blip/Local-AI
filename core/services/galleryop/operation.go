@@ -29,6 +29,9 @@ type ManagementOp[T any, E any] struct {
 	ExternalURI   string // The OCI image, URL, or path
 	ExternalName  string // Custom name for the backend
 	ExternalAlias string // Custom alias for the backend
+
+	// Upgrade is true if this is an upgrade operation (not a fresh install)
+	Upgrade bool
 }
 
 type OpStatus struct {

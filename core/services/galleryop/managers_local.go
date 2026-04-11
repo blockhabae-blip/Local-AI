@@ -92,6 +92,14 @@ func (b *LocalBackendManager) ListBackends() (gallery.SystemBackends, error) {
 	return gallery.ListSystemBackends(b.systemState)
 }
 
+func (b *LocalBackendManager) UpgradeBackend(ctx context.Context, name string, progressCb ProgressCallback) error {
+	return gallery.UpgradeBackend(ctx, b.systemState, b.modelLoader, b.backendGalleries, name, progressCb)
+}
+
+func (b *LocalBackendManager) CheckUpgrades(ctx context.Context) (map[string]gallery.UpgradeInfo, error) {
+	return gallery.CheckBackendUpgrades(ctx, b.backendGalleries, b.systemState)
+}
+
 func (b *LocalBackendManager) InstallBackend(ctx context.Context, op *ManagementOp[gallery.GalleryBackend, any], progressCb ProgressCallback) error {
 	if op.ExternalURI != "" {
 		return InstallExternalBackend(ctx, b.backendGalleries, b.systemState, b.modelLoader,

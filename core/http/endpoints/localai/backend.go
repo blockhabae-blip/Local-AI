@@ -15,23 +15,31 @@ import (
 	"github.com/mudler/xlog"
 )
 
+// UpgradeInfoProvider is an interface for querying cached backend upgrade information.
+type UpgradeInfoProvider interface {
+	GetAvailableUpgrades() map[string]gallery.UpgradeInfo
+	TriggerCheck()
+}
+
 type BackendEndpointService struct {
 	galleries         []config.Gallery
 	backendPath       string
 	backendSystemPath string
 	backendApplier    *galleryop.GalleryService
+	upgradeChecker    UpgradeInfoProvider
 }
 
 type GalleryBackend struct {
 	ID string `json:"id"`
 }
 
-func CreateBackendEndpointService(galleries []config.Gallery, systemState *system.SystemState, backendApplier *galleryop.GalleryService) BackendEndpointService {
+func CreateBackendEndpointService(galleries []config.Gallery, systemState *system.SystemState, backendApplier *galleryop.GalleryService, upgradeChecker UpgradeInfoProvider) BackendEndpointService {
 	return BackendEndpointService{
 		galleries:         galleries,
 		backendPath:       systemState.Backend.BackendsPath,
 		backendSystemPath: systemState.Backend.BackendsSystemPath,
 		backendApplier:    backendApplier,
+		upgradeChecker:    upgradeChecker,
 	}
 }
 
@@ -143,6 +151,62 @@ func (mgs *BackendEndpointService) ListBackendGalleriesEndpoint() echo.HandlerFu
 			return err
 		}
 		return c.Blob(200, "application/json", dat)
+	}
+}
+
+// GetUpgradesEndpoint returns the cached backend upgrade information
+// @Summary Get available backend upgrades
+// @Tags backends
+// @Success 200 {object} map[string]gallery.UpgradeInfo "Response"
+// @Router /backends/upgrades [get]
+func (mgs *BackendEndpointService) GetUpgradesEndpoint() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if mgs.upgradeChecker == nil {
+			return c.JSON(200, map[string]gallery.UpgradeInfo{})
+		}
+		return c.JSON(200, mgs.upgradeChecker.GetAvailableUpgrades())
+	}
+}
+
+// CheckUpgradesEndpoint forces an immediate upgrade check
+// @Summary Force backend upgrade check
+// @Tags backends
+// @Success 200 {object} map[string]gallery.UpgradeInfo "Response"
+// @Router /backends/upgrades/check [post]
+func (mgs *BackendEndpointService) CheckUpgradesEndpoint() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if mgs.upgradeChecker == nil {
+			return c.JSON(200, map[string]gallery.UpgradeInfo{})
+		}
+		mgs.upgradeChecker.TriggerCheck()
+		// Return current cached results (the triggered check runs async)
+		return c.JSON(200, mgs.upgradeChecker.GetAvailableUpgrades())
+	}
+}
+
+// UpgradeBackendEndpoint triggers an upgrade for a specific backend
+// @Summary Upgrade a backend
+// @Tags backends
+// @Param name path string true "Backend name"
+// @Success 200 {object} schema.BackendResponse "Response"
+// @Router /backends/upgrade/{name} [post]
+func (mgs *BackendEndpointService) UpgradeBackendEndpoint() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		backendName := c.Param("name")
+
+		uuid, err := uuid.NewUUID()
+		if err != nil {
+			return err
+		}
+
+		mgs.backendApplier.BackendGalleryChannel <- galleryop.ManagementOp[gallery.GalleryBackend, any]{
+			ID:                 uuid.String(),
+			GalleryElementName: backendName,
+			Galleries:          mgs.galleries,
+			Upgrade:            true,
+		}
+
+		return c.JSON(200, schema.BackendResponse{ID: uuid.String(), StatusURL: fmt.Sprintf("%sbackends/jobs/%s", middleware.BaseURL(c), uuid.String())})
 	}
 }
 

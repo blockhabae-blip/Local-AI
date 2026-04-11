@@ -26,6 +26,7 @@ export default function Backends() {
   const [expandedRow, setExpandedRow] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [allBackends, setAllBackends] = useState([])
+  const [upgrades, setUpgrades] = useState({})
 
   const fetchBackends = useCallback(async () => {
     try {
@@ -50,6 +51,13 @@ export default function Backends() {
   // Re-fetch when operations change (install/delete completion)
   useEffect(() => {
     if (!loading) fetchBackends()
+  }, [operations.length])
+
+  // Fetch available upgrades
+  useEffect(() => {
+    backendsApi.checkUpgrades()
+      .then(data => setUpgrades(data || {}))
+      .catch(() => {})
   }, [operations.length])
 
   // Client-side filtering by tag
@@ -112,6 +120,15 @@ export default function Backends() {
         }
       },
     })
+  }
+
+  const handleUpgrade = async (id) => {
+    try {
+      await backendsApi.upgrade(id)
+      addToast(`Upgrading ${id}...`, 'info')
+    } catch (err) {
+      addToast(`Upgrade failed: ${err.message}`, 'error')
+    }
   }
 
   const handleManualInstall = async (e) => {
@@ -179,6 +196,14 @@ export default function Backends() {
                 <div style={{ color: 'var(--color-text-muted)' }}>Installed</div>
               </a>
             </div>
+            {Object.keys(upgrades).length > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-warning)' }}>
+                  {Object.keys(upgrades).length}
+                </div>
+                <div style={{ color: 'var(--color-text-muted)' }}>Updates</div>
+              </div>
+            )}
           </div>
           <a className="btn btn-secondary btn-sm" href="https://localai.io/docs/getting-started/manual/" target="_blank" rel="noopener noreferrer">
             <i className="fas fa-book" /> Docs
@@ -300,6 +325,11 @@ export default function Backends() {
                     {/* Name */}
                     <td>
                       <span style={{ fontWeight: 500 }}>{b.name || b.id}</span>
+                      {b.version && (
+                        <span className="badge" style={{ fontSize: '0.625rem', marginLeft: 4, background: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}>
+                          v{b.version}
+                        </span>
+                      )}
                     </td>
 
                     {/* Description */}
@@ -346,9 +376,17 @@ export default function Backends() {
                           </span>
                         </div>
                       ) : b.installed ? (
-                        <span className="badge badge-success">
-                          <i className="fas fa-check" style={{ fontSize: '0.5rem', marginRight: 2 }} /> Installed
-                        </span>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span className="badge badge-success">
+                            <i className="fas fa-check" style={{ fontSize: '0.5rem', marginRight: 2 }} /> Installed
+                          </span>
+                          {upgrades[b.name] && (
+                            <span className="badge" style={{ fontSize: '0.625rem', background: '#fef3cd', color: '#856404' }}>
+                              <i className="fas fa-arrow-up" style={{ fontSize: '0.5rem', marginRight: 2 }} />
+                              {upgrades[b.name].available_version ? `v${upgrades[b.name].available_version}` : 'Update'}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="badge" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
                           <i className="fas fa-circle" style={{ fontSize: '0.5rem', marginRight: 2 }} /> Not Installed
@@ -361,9 +399,15 @@ export default function Backends() {
                       <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                         {b.installed ? (
                           <>
-                            <button className="btn btn-secondary btn-sm" onClick={() => handleInstall(b.name || b.id)} title="Reinstall" disabled={isProcessing}>
-                              <i className={`fas ${isProcessing ? 'fa-spinner fa-spin' : 'fa-rotate'}`} />
-                            </button>
+                            {upgrades[b.name] ? (
+                              <button className="btn btn-primary btn-sm" onClick={() => handleUpgrade(b.name || b.id)} title={`Upgrade to ${upgrades[b.name]?.available_version ? 'v' + upgrades[b.name].available_version : 'latest'}`} disabled={isProcessing}>
+                                <i className={`fas ${isProcessing ? 'fa-spinner fa-spin' : 'fa-arrow-up'}`} />
+                              </button>
+                            ) : (
+                              <button className="btn btn-secondary btn-sm" onClick={() => handleInstall(b.name || b.id)} title="Reinstall" disabled={isProcessing}>
+                                <i className={`fas ${isProcessing ? 'fa-spinner fa-spin' : 'fa-rotate'}`} />
+                              </button>
+                            )}
                             <button className="btn btn-danger btn-sm" onClick={() => handleDelete(b.name || b.id)} title="Delete" disabled={isProcessing}>
                               <i className="fas fa-trash" />
                             </button>

@@ -20,6 +20,7 @@ import (
 	"github.com/mudler/LocalAI/pkg/system"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v3"
 )
 
 func TestRoutes(t *testing.T) {
@@ -174,6 +175,161 @@ var _ = Describe("Backend API Routes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response["queued"]).To(Equal(true))
 			Expect(response["processed"]).To(Equal(false))
+		})
+	})
+
+	Describe("Backend upgrade API", func() {
+		var (
+			galleryFile        string
+			upgradeApp         *echo.Echo
+			upgradeGallerySvc  *galleryop.GalleryService
+		)
+
+		BeforeEach(func() {
+			// Place gallery file inside backends dir so it passes trusted root checks
+			galleryFile = filepath.Join(systemState.Backend.BackendsPath, "test-gallery.yaml")
+
+			// Create a fake "v1" backend on disk (simulates a previously installed backend)
+			backendDir := filepath.Join(systemState.Backend.BackendsPath, "test-upgrade-backend")
+			err := os.MkdirAll(backendDir, 0750)
+			Expect(err).NotTo(HaveOccurred())
+			err = os.WriteFile(filepath.Join(backendDir, "run.sh"), []byte("#!/bin/sh\necho v1"), 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Write metadata.json for the installed backend (v1)
+			metadata := map[string]string{
+				"name":         "test-upgrade-backend",
+				"version":      "1.0.0",
+				"installed_at": "2024-01-01T00:00:00Z",
+			}
+			metadataBytes, err := json.MarshalIndent(metadata, "", "  ")
+			Expect(err).NotTo(HaveOccurred())
+			err = os.WriteFile(filepath.Join(backendDir, "metadata.json"), metadataBytes, 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create a "v2" source directory (the upgrade target)
+			// Must be inside backends path to pass trusted root checks
+			v2SrcDir := filepath.Join(systemState.Backend.BackendsPath, "v2-backend-src")
+			err = os.MkdirAll(v2SrcDir, 0750)
+			Expect(err).NotTo(HaveOccurred())
+			err = os.WriteFile(filepath.Join(v2SrcDir, "run.sh"), []byte("#!/bin/sh\necho v2"), 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Write gallery YAML pointing to v2
+			galleryData := []map[string]any{
+				{
+					"name":    "test-upgrade-backend",
+					"uri":     v2SrcDir,
+					"version": "2.0.0",
+				},
+			}
+			yamlBytes, err := yaml.Marshal(galleryData)
+			Expect(err).NotTo(HaveOccurred())
+			err = os.WriteFile(galleryFile, yamlBytes, 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Configure the gallery in appConfig BEFORE creating the gallery service
+			// so the backend manager captures the correct galleries
+			appConfig.BackendGalleries = []config.Gallery{
+				{Name: "test", URL: "file://" + galleryFile},
+			}
+
+			// Create a fresh gallery service with the upgrade gallery configured
+			upgradeGallerySvc = galleryop.NewGalleryService(appConfig, modelLoader)
+			err = upgradeGallerySvc.Start(context.Background(), configLoader, systemState)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Register routes with the upgrade-aware gallery service
+			upgradeApp = echo.New()
+			opcache := galleryop.NewOpCache(upgradeGallerySvc)
+			noopMw := func(next echo.HandlerFunc) echo.HandlerFunc { return next }
+			routes.RegisterUIAPIRoutes(upgradeApp, configLoader, modelLoader, appConfig, upgradeGallerySvc, opcache, nil, noopMw)
+		})
+
+		Describe("GET /api/backends/upgrades", func() {
+			It("should return available upgrades", func() {
+				req := httptest.NewRequest(http.MethodGet, "/api/backends/upgrades", nil)
+				rec := httptest.NewRecorder()
+
+				upgradeApp.ServeHTTP(rec, req)
+
+				Expect(rec.Code).To(Equal(http.StatusOK))
+
+				var response map[string]any
+				err := json.Unmarshal(rec.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				// Response is empty (upgrade checker not running in test),
+				// but the endpoint should not error
+			})
+		})
+
+		Describe("POST /api/backends/upgrade/:name", func() {
+			It("should accept upgrade request and return job ID", func() {
+				req := httptest.NewRequest(http.MethodPost, "/api/backends/upgrade/test-upgrade-backend", nil)
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+
+				upgradeApp.ServeHTTP(rec, req)
+
+				Expect(rec.Code).To(Equal(http.StatusOK))
+
+				var response map[string]any
+				err := json.Unmarshal(rec.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response["uuid"]).NotTo(BeEmpty())
+				Expect(response["statusUrl"]).NotTo(BeEmpty())
+			})
+
+			It("should upgrade the backend and update metadata", func() {
+				req := httptest.NewRequest(http.MethodPost, "/api/backends/upgrade/test-upgrade-backend", nil)
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+
+				upgradeApp.ServeHTTP(rec, req)
+				Expect(rec.Code).To(Equal(http.StatusOK))
+
+				var response map[string]any
+				err := json.Unmarshal(rec.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				jobID := response["uuid"].(string)
+
+				// Wait for the upgrade job to complete
+				Eventually(func() bool {
+					jobReq := httptest.NewRequest(http.MethodGet, "/api/backends/job/"+jobID, nil)
+					jobRec := httptest.NewRecorder()
+					upgradeApp.ServeHTTP(jobRec, jobReq)
+
+					var jobResp map[string]any
+					json.Unmarshal(jobRec.Body.Bytes(), &jobResp)
+
+					processed, _ := jobResp["processed"].(bool)
+					return processed
+				}, "10s", "200ms").Should(BeTrue())
+
+				// Verify the backend was upgraded: run.sh should now contain "v2"
+				runContent, err := os.ReadFile(filepath.Join(
+					systemState.Backend.BackendsPath, "test-upgrade-backend", "run.sh"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(runContent)).To(ContainSubstring("v2"))
+
+				// Verify metadata was updated with new version
+				metadataContent, err := os.ReadFile(filepath.Join(
+					systemState.Backend.BackendsPath, "test-upgrade-backend", "metadata.json"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(metadataContent)).To(ContainSubstring(`"version": "2.0.0"`))
+			})
+		})
+
+		Describe("POST /api/backends/upgrades/check", func() {
+			It("should trigger an upgrade check and return 200", func() {
+				req := httptest.NewRequest(http.MethodPost, "/api/backends/upgrades/check", nil)
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+
+				upgradeApp.ServeHTTP(rec, req)
+
+				Expect(rec.Code).To(Equal(http.StatusOK))
+			})
 		})
 	})
 })
