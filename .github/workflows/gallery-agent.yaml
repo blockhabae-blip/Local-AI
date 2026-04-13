@@ -48,21 +48,37 @@ jobs:
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@1958fcbe2ca8bd93af633f11e97d44e567e945af
           PATH="$PATH:$HOME/go/bin" make protogen-go
-      - uses: mudler/localai-github-action@v1.1
-        with:
-          model: 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF'
+      - name: Collect URLs from open gallery-agent PRs
+        id: open_prs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Gather model URLs already proposed in any open gallery-agent PR so
+          # the agent can skip them and not re-propose the same model while a
+          # previous PR is still waiting to be merged.
+          urls=$(gh pr list \
+            --repo ${{ github.repository }} \
+            --state open \
+            --search 'chore(model gallery) in:title :robot:' \
+            --json body \
+            --jq '[.[].body] | join("\n")' \
+            | grep -oE 'https://huggingface\.co/[^ )]+' \
+            | sort -u || true)
+          echo "Found URLs from open PRs:"
+          echo "$urls"
+          {
+            echo "urls<<EOF"
+            echo "$urls"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run gallery agent
         env:
-          #OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          OPENAI_MODEL: Qwen3.5-2B-GGUF
-          OPENAI_BASE_URL: "http://localhost:8080"
-          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-          #OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           SEARCH_TERM: ${{ github.event.inputs.search_term || 'GGUF' }}
           LIMIT: ${{ github.event.inputs.limit || '15' }}
           QUANTIZATION: ${{ github.event.inputs.quantization || 'Q4_K_M' }}
           MAX_MODELS: ${{ github.event.inputs.max_models || '1' }}
+          EXTRA_SKIP_URLS: ${{ steps.open_prs.outputs.urls }}
         run: |
           export GALLERY_INDEX_PATH=$PWD/gallery/index.yaml
           go run ./.github/gallery-agent

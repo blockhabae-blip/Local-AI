@@ -138,6 +138,22 @@ func (c *Client) GetLatest(searchTerm string, limit int) ([]Model, error) {
 	return c.SearchModels(params)
 }
 
+// GetTrending fetches models sorted by HuggingFace's trendingScore — the
+// same signal the public "Trending" tab uses. Useful when picking fresh
+// candidates to add to a gallery: it biases toward repos that are gaining
+// attention right now, rather than strictly newest or strictly most
+// downloaded overall.
+func (c *Client) GetTrending(searchTerm string, limit int) ([]Model, error) {
+	params := SearchParams{
+		Sort:      "trendingScore",
+		Direction: -1,
+		Limit:     limit,
+		Search:    searchTerm,
+	}
+
+	return c.SearchModels(params)
+}
+
 // BaseURL returns the current base URL
 func (c *Client) BaseURL() string {
 	return c.baseURL
