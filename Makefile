@@ -466,8 +466,14 @@ test-extra: prepare-test-extra
 ##   BACKEND_IMAGE            Required. Docker image to test, e.g. local-ai-backend:llama-cpp.
 ##   BACKEND_TEST_MODEL_URL   URL of a model file to download and load.
 ##   BACKEND_TEST_MODEL_FILE  Path to an already-downloaded model (skips download).
+##   BACKEND_TEST_MODEL_NAME  HuggingFace repo id (e.g. Qwen/Qwen2.5-0.5B-Instruct).
+##                            Use this instead of MODEL_URL for backends that
+##                            resolve HF model ids natively (vllm, vllm-omni).
 ##   BACKEND_TEST_CAPS        Comma-separated capabilities, default "health,load,predict,stream".
+##                            Adds "tools" to exercise ChatDelta tool call extraction.
 ##   BACKEND_TEST_PROMPT      Override the prompt used in predict/stream specs.
+##   BACKEND_TEST_OPTIONS     Comma-separated Options[] entries forwarded to LoadModel,
+##                            e.g. "tool_parser:hermes,reasoning_parser:qwen3".
 ##
 ## Direct usage (image already built, no docker-build-* dependency):
 ##
@@ -486,9 +492,13 @@ test-extra-backend: protogen-go
 	BACKEND_IMAGE="$$BACKEND_IMAGE" \
 	BACKEND_TEST_MODEL_URL="$${BACKEND_TEST_MODEL_URL:-$(BACKEND_TEST_MODEL_URL)}" \
 	BACKEND_TEST_MODEL_FILE="$$BACKEND_TEST_MODEL_FILE" \
+	BACKEND_TEST_MODEL_NAME="$$BACKEND_TEST_MODEL_NAME" \
 	BACKEND_TEST_CAPS="$$BACKEND_TEST_CAPS" \
 	BACKEND_TEST_PROMPT="$$BACKEND_TEST_PROMPT" \
-	go test -v -timeout 15m ./tests/e2e-backends/...
+	BACKEND_TEST_OPTIONS="$$BACKEND_TEST_OPTIONS" \
+	BACKEND_TEST_TOOL_PROMPT="$$BACKEND_TEST_TOOL_PROMPT" \
+	BACKEND_TEST_TOOL_NAME="$$BACKEND_TEST_TOOL_NAME" \
+	go test -v -timeout 30m ./tests/e2e-backends/...
 
 ## Convenience wrappers: build the image, then exercise it.
 test-extra-backend-llama-cpp: docker-build-llama-cpp
@@ -496,6 +506,18 @@ test-extra-backend-llama-cpp: docker-build-llama-cpp
 
 test-extra-backend-ik-llama-cpp: docker-build-ik-llama-cpp
 	BACKEND_IMAGE=local-ai-backend:ik-llama-cpp $(MAKE) test-extra-backend
+
+## vllm is resolved from a HuggingFace model id (no file download) and
+## exercises Predict + streaming + tool-call extraction via the hermes parser.
+## Requires a host CPU with the SIMD instructions the prebuilt vllm CPU
+## wheel was compiled against (AVX-512 VNNI/BF16); older CPUs will SIGILL
+## on import — on CI this means using the bigger-runner label.
+test-extra-backend-vllm: docker-build-vllm
+	BACKEND_IMAGE=local-ai-backend:vllm \
+	BACKEND_TEST_MODEL_NAME=Qwen/Qwen2.5-0.5B-Instruct \
+	BACKEND_TEST_CAPS=health,load,predict,stream,tools \
+	BACKEND_TEST_OPTIONS=tool_parser:hermes \
+	$(MAKE) test-extra-backend
 
 DOCKER_IMAGE?=local-ai
 IMAGE_TYPE?=core
@@ -650,6 +672,7 @@ define docker-build-backend
 		--build-arg CUDA_MINOR_VERSION=$(CUDA_MINOR_VERSION) \
 		--build-arg UBUNTU_VERSION=$(UBUNTU_VERSION) \
 		--build-arg UBUNTU_CODENAME=$(UBUNTU_CODENAME) \
+		$(if $(FROM_SOURCE),--build-arg FROM_SOURCE=$(FROM_SOURCE)) \
 		$(if $(filter true,$(5)),--build-arg BACKEND=$(1)) \
 		-t local-ai-backend:$(1) -f backend/Dockerfile.$(2) $(3)
 endef

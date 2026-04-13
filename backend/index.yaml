@@ -197,6 +197,7 @@
     amd: "rocm-vllm"
     intel: "intel-vllm"
     nvidia-cuda-12: "cuda12-vllm"
+    cpu: "cpu-vllm"
 - &vllm-omni
   name: "vllm-omni"
   license: apache-2.0
@@ -1563,6 +1564,7 @@
     nvidia: "cuda12-vllm-development"
     amd: "rocm-vllm-development"
     intel: "intel-vllm-development"
+    cpu: "cpu-vllm-development"
 - !!merge <<: *vllm
   name: "cuda12-vllm"
   uri: "quay.io/go-skynet/local-ai-backends:latest-gpu-nvidia-cuda-12-vllm"
@@ -1579,6 +1581,11 @@
   mirrors:
     - localai/localai-backends:latest-gpu-intel-vllm
 - !!merge <<: *vllm
+  name: "cpu-vllm"
+  uri: "quay.io/go-skynet/local-ai-backends:latest-cpu-vllm"
+  mirrors:
+    - localai/localai-backends:latest-cpu-vllm
+- !!merge <<: *vllm
   name: "cuda12-vllm-development"
   uri: "quay.io/go-skynet/local-ai-backends:master-gpu-nvidia-cuda-12-vllm"
   mirrors:
@@ -1593,6 +1600,11 @@
   uri: "quay.io/go-skynet/local-ai-backends:master-gpu-intel-vllm"
   mirrors:
     - localai/localai-backends:master-gpu-intel-vllm
+- !!merge <<: *vllm
+  name: "cpu-vllm-development"
+  uri: "quay.io/go-skynet/local-ai-backends:master-cpu-vllm"
+  mirrors:
+    - localai/localai-backends:master-cpu-vllm
 # vllm-omni
 - !!merge <<: *vllm-omni
   name: "vllm-omni-development"

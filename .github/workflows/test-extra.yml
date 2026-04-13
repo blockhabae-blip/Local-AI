@@ -31,6 +31,7 @@ jobs:
       llama-cpp-quantization: ${{ steps.detect.outputs.llama-cpp-quantization }}
       llama-cpp: ${{ steps.detect.outputs.llama-cpp }}
       ik-llama-cpp: ${{ steps.detect.outputs.ik-llama-cpp }}
+      vllm: ${{ steps.detect.outputs.vllm }}
       acestep-cpp: ${{ steps.detect.outputs.acestep-cpp }}
       qwen3-tts-cpp: ${{ steps.detect.outputs.qwen3-tts-cpp }}
       voxtral: ${{ steps.detect.outputs.voxtral }}
@@ -501,6 +502,52 @@ jobs:
       - name: Build ik-llama-cpp backend image and run gRPC e2e tests
         run: |
           make test-extra-backend-ik-llama-cpp
+  # tests-vllm-grpc is currently disabled in CI.
+  #
+  # The prebuilt vllm CPU wheel is compiled with AVX-512 VNNI/BF16
+  # instructions, and neither ubuntu-latest nor the bigger-runner pool
+  # offers a stable CPU baseline that supports them — runners come
+  # back with different hardware between runs and SIGILL on import of
+  # vllm.model_executor.models.registry. Compiling vllm from source
+  # via FROM_SOURCE=true works on any CPU but takes 30-50 minutes per
+  # run, which is too slow for a smoke test.
+  #
+  # The test itself (tests/e2e-backends + make test-extra-backend-vllm)
+  # is fully working and validated locally on a host with the right
+  # SIMD baseline. Run it manually with:
+  #
+  #   make test-extra-backend-vllm
+  #
+  # Re-enable this job once we have a self-hosted runner label with
+  # guaranteed AVX-512 VNNI/BF16 support, or once the vllm project
+  # publishes a CPU wheel with a wider baseline.
+  #
+  # tests-vllm-grpc:
+  #   needs: detect-changes
+  #   if: needs.detect-changes.outputs.vllm == 'true' || needs.detect-changes.outputs.run-all == 'true'
+  #   runs-on: bigger-runner
+  #   timeout-minutes: 90
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v6
+  #       with:
+  #         submodules: true
+  #     - name: Dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y --no-install-recommends \
+  #             make build-essential curl unzip ca-certificates git tar
+  #     - name: Setup Go
+  #       uses: actions/setup-go@v5
+  #       with:
+  #         go-version: '1.25.4'
+  #     - name: Free disk space
+  #       run: |
+  #         sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL || true
+  #         df -h
+  #     - name: Build vllm (cpu) backend image and run gRPC e2e tests
+  #       run: |
+  #         make test-extra-backend-vllm
   tests-acestep-cpp:
     needs: detect-changes
     if: needs.detect-changes.outputs.acestep-cpp == 'true' || needs.detect-changes.outputs.run-all == 'true'

@@ -29,18 +29,30 @@ import (
 //
 //	BACKEND_TEST_MODEL_URL   HTTP(S) URL of a model file to download before the test.
 //	BACKEND_TEST_MODEL_FILE  Path to an already-available model file (skips download).
+//	BACKEND_TEST_MODEL_NAME  HuggingFace model id (e.g. "Qwen/Qwen2.5-0.5B-Instruct").
+//	                         Passed verbatim as ModelOptions.Model; backends like vllm
+//	                         resolve it themselves and no local file is downloaded.
 //
 // Optional:
 //
 //	BACKEND_TEST_CAPS        Comma-separated list of capabilities to exercise.
-//	                         Supported values: health, load, predict, stream, embeddings.
+//	                         Supported values: health, load, predict, stream,
+//	                         embeddings, tools.
 //	                         Defaults to "health,load,predict,stream".
 //	                         A backend that only does embeddings would set this to
 //	                         "health,load,embeddings"; an image/TTS backend that cannot
 //	                         be driven by a text prompt can set it to "health,load".
+//	                         "tools" asks the backend to extract a tool call from the
+//	                         model output into ChatDelta.tool_calls.
 //	BACKEND_TEST_PROMPT      Override the prompt used by predict/stream specs.
 //	BACKEND_TEST_CTX_SIZE    Override the context size passed to LoadModel (default 512).
 //	BACKEND_TEST_THREADS     Override Threads passed to LoadModel (default 4).
+//	BACKEND_TEST_OPTIONS     Comma-separated Options[] entries passed to LoadModel,
+//	                         e.g. "tool_parser:hermes,reasoning_parser:qwen3".
+//	BACKEND_TEST_TOOL_PROMPT Override the user prompt for the tools spec
+//	                         (default: "What's the weather like in Paris, France?").
+//	BACKEND_TEST_TOOL_NAME   Override the function name expected in the tool call
+//	                         (default: "get_weather").
 //
 // The suite is intentionally model-format-agnostic: it only ever passes the
 // file path to LoadModel, so GGUF, ONNX, safetensors, .bin etc. all work so
@@ -51,9 +63,12 @@ const (
 	capPredict    = "predict"
 	capStream     = "stream"
 	capEmbeddings = "embeddings"
+	capTools      = "tools"
 
-	defaultPrompt = "The capital of France is"
-	streamPrompt  = "Once upon a time"
+	defaultPrompt     = "The capital of France is"
+	streamPrompt      = "Once upon a time"
+	defaultToolPrompt = "What's the weather like in Paris, France?"
+	defaultToolName   = "get_weather"
 )
 
 func defaultCaps() map[string]bool {
@@ -87,12 +102,14 @@ var _ = Describe("Backend container", Ordered, func() {
 		caps      map[string]bool
 		workDir   string
 		binaryDir string
-		modelFile string
+		modelFile string // set when a local file is used
+		modelName string // set when a HuggingFace model id is used
 		addr      string
 		serverCmd *exec.Cmd
 		conn      *grpc.ClientConn
 		client    pb.BackendClient
 		prompt    string
+		options   []string
 	)
 
 	BeforeAll(func() {
@@ -101,8 +118,9 @@ var _ = Describe("Backend container", Ordered, func() {
 
 		modelURL := os.Getenv("BACKEND_TEST_MODEL_URL")
 		modelFile = os.Getenv("BACKEND_TEST_MODEL_FILE")
-		Expect(modelURL != "" || modelFile != "").To(BeTrue(),
-			"one of BACKEND_TEST_MODEL_URL or BACKEND_TEST_MODEL_FILE must be set")
+		modelName = os.Getenv("BACKEND_TEST_MODEL_NAME")
+		Expect(modelURL != "" || modelFile != "" || modelName != "").To(BeTrue(),
+			"one of BACKEND_TEST_MODEL_URL, BACKEND_TEST_MODEL_FILE, or BACKEND_TEST_MODEL_NAME must be set")
 
 		caps = parseCaps()
 		GinkgoWriter.Printf("Testing image=%q with capabilities=%v\n", image, keys(caps))
@@ -110,6 +128,15 @@ var _ = Describe("Backend container", Ordered, func() {
 		prompt = os.Getenv("BACKEND_TEST_PROMPT")
 		if prompt == "" {
 			prompt = defaultPrompt
+		}
+
+		if raw := strings.TrimSpace(os.Getenv("BACKEND_TEST_OPTIONS")); raw != "" {
+			for _, opt := range strings.Split(raw, ",") {
+				opt = strings.TrimSpace(opt)
+				if opt != "" {
+					options = append(options, opt)
+				}
+			}
 		}
 
 		var err error
@@ -122,8 +149,8 @@ var _ = Describe("Backend container", Ordered, func() {
 		extractImage(image, binaryDir)
 		Expect(filepath.Join(binaryDir, "run.sh")).To(BeAnExistingFile())
 
-		// Download the model once if not provided.
-		if modelFile == "" {
+		// Download the model once if not provided and no HF name given.
+		if modelFile == "" && modelName == "" {
 			modelFile = filepath.Join(workDir, "model.bin")
 			downloadFile(modelURL, modelFile)
 		}
@@ -196,16 +223,27 @@ var _ = Describe("Backend container", Ordered, func() {
 		ctxSize := envInt32("BACKEND_TEST_CTX_SIZE", 512)
 		threads := envInt32("BACKEND_TEST_THREADS", 4)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		// Prefer a HuggingFace model id when provided (e.g. for vllm);
+		// otherwise fall back to a downloaded/local file path.
+		modelRef := modelFile
+		var modelPath string
+		if modelName != "" {
+			modelRef = modelName
+		} else {
+			modelPath = modelFile
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		res, err := client.LoadModel(ctx, &pb.ModelOptions{
-			Model:       modelFile,
-			ModelFile:   modelFile,
+			Model:       modelRef,
+			ModelFile:   modelPath,
 			ContextSize: ctxSize,
 			Threads:     threads,
 			NGPULayers:  0,
 			MMap:        true,
 			NBatch:      128,
+			Options:     options,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.GetSuccess()).To(BeTrue(), "LoadModel failed: %s", res.GetMessage())
@@ -274,6 +312,78 @@ var _ = Describe("Backend container", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.GetEmbeddings()).NotTo(BeEmpty(), "Embedding returned empty vector")
 		GinkgoWriter.Printf("Embedding: %d dims\n", len(res.GetEmbeddings()))
+	})
+
+	It("extracts tool calls into ChatDelta", func() {
+		if !caps[capTools] {
+			Skip("tools capability not enabled")
+		}
+
+		toolPrompt := os.Getenv("BACKEND_TEST_TOOL_PROMPT")
+		if toolPrompt == "" {
+			toolPrompt = defaultToolPrompt
+		}
+		toolName := os.Getenv("BACKEND_TEST_TOOL_NAME")
+		if toolName == "" {
+			toolName = defaultToolName
+		}
+
+		toolsJSON := fmt.Sprintf(`[{
+			"type": "function",
+			"function": {
+				"name": %q,
+				"description": "Get the current weather for a location",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"location": {
+							"type": "string",
+							"description": "The city and state, e.g. San Francisco, CA"
+						}
+					},
+					"required": ["location"]
+				}
+			}
+		}]`, toolName)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		res, err := client.Predict(ctx, &pb.PredictOptions{
+			Messages: []*pb.Message{
+				{Role: "system", Content: "You are a helpful assistant. Use the provided tool when the user asks about weather."},
+				{Role: "user", Content: toolPrompt},
+			},
+			Tools:                toolsJSON,
+			ToolChoice:           "auto",
+			UseTokenizerTemplate: true,
+			Tokens:               200,
+			Temperature:          0.1,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Collect tool calls from every delta — some backends emit a single
+		// final delta, others stream incremental pieces in one Reply.
+		var toolCalls []*pb.ToolCallDelta
+		for _, delta := range res.GetChatDeltas() {
+			toolCalls = append(toolCalls, delta.GetToolCalls()...)
+		}
+
+		GinkgoWriter.Printf("Tool call: raw=%q deltas=%d tool_calls=%d\n",
+			string(res.GetMessage()), len(res.GetChatDeltas()), len(toolCalls))
+
+		Expect(toolCalls).NotTo(BeEmpty(),
+			"Predict did not return any ToolCallDelta. raw=%q", string(res.GetMessage()))
+
+		matched := false
+		for _, tc := range toolCalls {
+			GinkgoWriter.Printf("  - idx=%d id=%q name=%q args=%q\n",
+				tc.GetIndex(), tc.GetId(), tc.GetName(), tc.GetArguments())
+			if tc.GetName() == toolName {
+				matched = true
+			}
+		}
+		Expect(matched).To(BeTrue(),
+			"Expected a tool call named %q in ChatDelta.tool_calls", toolName)
 	})
 })
 

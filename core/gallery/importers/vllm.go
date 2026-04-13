@@ -88,6 +88,18 @@ func (i *VLLMImporter) Import(details Details) (gallery.ModelConfig, error) {
 	// Apply per-model-family inference parameter defaults
 	config.ApplyInferenceDefaults(&modelConfig, details.URI)
 
+	// Auto-detect tool_parser and reasoning_parser for known model families.
+	// Surfacing them in the generated YAML lets users see and edit the choices.
+	parsers := config.MatchParserDefaults(details.URI)
+	if parsers != nil {
+		if tp, ok := parsers["tool_parser"]; ok {
+			modelConfig.Options = append(modelConfig.Options, "tool_parser:"+tp)
+		}
+		if rp, ok := parsers["reasoning_parser"]; ok {
+			modelConfig.Options = append(modelConfig.Options, "reasoning_parser:"+rp)
+		}
+	}
+
 	data, err := yaml.Marshal(modelConfig)
 	if err != nil {
 		return gallery.ModelConfig{}, err

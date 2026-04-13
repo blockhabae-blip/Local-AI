@@ -497,7 +497,12 @@ func (cfg *ModelConfig) SetDefaults(opts ...ConfigLoaderOption) {
 		cfg.Debug = &trueV
 	}
 
-	guessDefaultsFromFile(cfg, lo.modelPath, ctx)
+	// If a context size was provided via LoadOptions, apply it before hooks so they
+	// don't override it with their own defaults.
+	if ctx != 0 && cfg.ContextSize == nil {
+		cfg.ContextSize = &ctx
+	}
+	runBackendHooks(cfg, lo.modelPath)
 	cfg.syncKnownUsecasesFromString()
 }
 

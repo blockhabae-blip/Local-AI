@@ -83,8 +83,12 @@ func (messages Messages) ToProto() []*proto.Message {
 			}
 		}
 
-		// Note: tool_call_id is not in schema.Message yet
-		// Reasoning field is now available in schema.Message but not yet in proto.Message
+		if message.ToolCallID != "" {
+			protoMessages[i].ToolCallId = message.ToolCallID
+		}
+		if message.Reasoning != nil {
+			protoMessages[i].ReasoningContent = *message.Reasoning
+		}
 	}
 	return protoMessages
 }

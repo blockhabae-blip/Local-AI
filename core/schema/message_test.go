@@ -237,6 +237,24 @@ var _ = Describe("LLM tests", func() {
 			Expect(protoMessages[0].Content).To(Equal(""))
 		})
 
+		It("should serialize ToolCallID and Reasoning fields", func() {
+			reasoning := "thinking..."
+			messages := Messages{
+				{
+					Role:       "tool",
+					Content:    "result",
+					ToolCallID: "call_123",
+					Reasoning:  &reasoning,
+				},
+			}
+
+			protoMessages := messages.ToProto()
+
+			Expect(protoMessages).To(HaveLen(1))
+			Expect(protoMessages[0].ToolCallId).To(Equal("call_123"))
+			Expect(protoMessages[0].ReasoningContent).To(Equal("thinking..."))
+		})
+
 		It("should handle message with array content containing non-text parts", func() {
 			messages := Messages{
 				{
