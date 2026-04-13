@@ -200,17 +200,23 @@ func main() {
 		}
 
 		// Deterministic README resolution: follow base_model tag if set.
+		// Keep the raw (HTML-bearing) README around while we extract the
+		// icon, then strip it down to a plain-text description for the
+		// `description:` YAML field.
 		readme, err := resolveReadme(client, m.ModelID, m.Tags)
-		if err == nil {
-			pm.ReadmeContent = readme
-			pm.ReadmeContentPreview = truncateString(readme, 200)
-		} else {
+		if err != nil {
 			fmt.Printf("  Warning: failed to fetch README: %v\n", err)
 		}
+		pm.ReadmeContent = readme
 
 		pm.License = licenseFromTags(m.Tags)
 		pm.Tags = curatedTags(m.Tags)
 		pm.Icon = extractModelIcon(pm)
+
+		if pm.ReadmeContent != "" {
+			pm.ReadmeContent = extractDescription(pm.ReadmeContent)
+			pm.ReadmeContentPreview = truncateString(pm.ReadmeContent, 200)
+		}
 
 		fmt.Printf("  License: %s, Tags: %v, Icon: %s\n", pm.License, pm.Tags, pm.Icon)
 		processed = append(processed, pm)

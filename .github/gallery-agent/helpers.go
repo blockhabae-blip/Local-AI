@@ -141,6 +141,65 @@ func resolveReadme(client *hfapi.Client, modelID string, hfTags []string) (strin
 	return cleanTextContent(content), nil
 }
 
+// extractDescription turns a raw HuggingFace README into a concise plain-text
+// description suitable for embedding in gallery/index.yaml: strips YAML
+// frontmatter, HTML tags/comments, markdown images, link URLs (keeping the
+// link text), markdown tables, and then truncates at a paragraph boundary
+// around ~1200 characters. Raw README should still be used for icon
+// extraction — call this only for the `description:` field.
+func extractDescription(readme string) string {
+	s := readme
+
+	// Strip leading YAML frontmatter: `---\n...\n---\n` at start of file.
+	if strings.HasPrefix(strings.TrimLeft(s, " \t\n"), "---") {
+		trimmed := strings.TrimLeft(s, " \t\n")
+		rest := strings.TrimPrefix(trimmed, "---")
+		if idx := strings.Index(rest, "\n---"); idx >= 0 {
+			after := rest[idx+len("\n---"):]
+			after = strings.TrimPrefix(after, "\n")
+			s = after
+		}
+	}
+
+	// Strip HTML comments and tags.
+	s = regexp.MustCompile(`(?s)<!--.*?-->`).ReplaceAllString(s, "")
+	s = regexp.MustCompile(`(?is)<[^>]+>`).ReplaceAllString(s, "")
+
+	// Strip markdown images entirely.
+	s = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`).ReplaceAllString(s, "")
+	// Replace markdown links `[text](url)` with just `text`.
+	s = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`).ReplaceAllString(s, "$1")
+
+	// Drop table lines and horizontal rules.
+	var kept []string
+	for _, line := range strings.Split(s, "\n") {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "|") {
+			continue
+		}
+		if strings.HasPrefix(t, ":--") || strings.HasPrefix(t, "---") || strings.HasPrefix(t, "===") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	s = strings.Join(kept, "\n")
+
+	// Normalise whitespace.
+	s = cleanTextContent(s)
+
+	// Truncate at a paragraph boundary around maxLen chars.
+	const maxLen = 1200
+	if len(s) > maxLen {
+		cut := strings.LastIndex(s[:maxLen], "\n\n")
+		if cut < maxLen/3 {
+			cut = maxLen
+		}
+		s = strings.TrimRight(s[:cut], " \t\n") + "\n\n..."
+	}
+
+	return s
+}
+
 // cleanTextContent removes trailing spaces/tabs and collapses multiple empty
 // lines so README content embeds cleanly into YAML without lint noise.
 func cleanTextContent(text string) string {
