@@ -170,22 +170,33 @@ func extractDescription(readme string) string {
 	// Replace markdown links `[text](url)` with just `text`.
 	s = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`).ReplaceAllString(s, "$1")
 
-	// Drop table lines and horizontal rules.
+	// Drop table lines and horizontal rules, and flatten all leading
+	// whitespace: generateYAMLEntry embeds this under a `description: |`
+	// literal block whose indentation is set by the first non-empty line.
+	// If any line has extra leading whitespace (e.g. from an indented
+	// `<p align="center">` block in the original README), YAML will pick
+	// that up as the block's indent and every later line at a smaller
+	// indent blows the block scalar. Stripping leading whitespace here
+	// guarantees uniform 4-space indentation after formatTextContent runs.
 	var kept []string
 	for _, line := range strings.Split(s, "\n") {
-		t := strings.TrimSpace(line)
-		if strings.HasPrefix(t, "|") {
+		t := strings.TrimLeft(line, " \t")
+		ts := strings.TrimSpace(t)
+		if strings.HasPrefix(ts, "|") {
 			continue
 		}
-		if strings.HasPrefix(t, ":--") || strings.HasPrefix(t, "---") || strings.HasPrefix(t, "===") {
+		if strings.HasPrefix(ts, ":--") || strings.HasPrefix(ts, "---") || strings.HasPrefix(ts, "===") {
 			continue
 		}
-		kept = append(kept, line)
+		kept = append(kept, t)
 	}
 	s = strings.Join(kept, "\n")
 
-	// Normalise whitespace.
+	// Normalise whitespace and drop any leading blank lines so the literal
+	// block in YAML doesn't start with a blank first line (which would
+	// break the indentation detector the same way).
 	s = cleanTextContent(s)
+	s = strings.TrimLeft(s, " \t\n")
 
 	// Truncate at a paragraph boundary around maxLen chars.
 	const maxLen = 1200

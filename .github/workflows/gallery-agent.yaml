@@ -52,7 +52,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.UPDATE_BOT_TOKEN }}
           REPO: ${{ github.repository }}
-          SEARCH: 'chore(model gallery) in:title :robot:'
+          SEARCH: 'gallery agent in:title'
         run: |
           # Walk open gallery-agent PRs and act on maintainer comments:
           #   /gallery-agent blacklist → label `gallery-agent/blacklisted` + close (never repropose)
@@ -82,7 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          SEARCH: 'chore(model gallery) in:title :robot:'
+          SEARCH: 'gallery agent in:title'
         run: |
           # Skip set =
           #   URLs from any open gallery-agent PR (avoid duplicate PRs for the same model while one is pending)
