@@ -420,7 +420,7 @@ export default function Home() {
               <span className="home-loaded-dot" />
               <span className="home-loaded-text">{loadedCount} model{loadedCount !== 1 ? 's' : ''} loaded</span>
               <div className="home-loaded-list">
-                {loadedModels.map(m => (
+                {[...loadedModels].sort((a, b) => a.id.localeCompare(b.id)).map(m => (
                   <span key={m.id} className="home-loaded-item">
                     {m.id}
                     <button onClick={() => handleStopModel(m.id)} title="Stop model">

@@ -356,7 +356,15 @@ export default function AgentChat() {
   }, [input, processing, name, activeId, addToast, userId, addMessage, nextId])
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      !e.nativeEvent?.isComposing &&
+      e.keyCode !== 229
+    ) {
       e.preventDefault()
       handleSend()
     }

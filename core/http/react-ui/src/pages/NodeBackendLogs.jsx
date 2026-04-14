@@ -11,8 +11,8 @@ function wsUrl(path) {
 }
 
 const STREAM_BADGE = {
-  stdout: { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa', label: 'stdout' },
-  stderr: { bg: 'rgba(239,68,68,0.15)', color: '#f87171', label: 'stderr' },
+  stdout: { bg: 'var(--color-info-light)', color: 'var(--color-log-info)', label: 'stdout' },
+  stderr: { bg: 'var(--color-error-light)', color: 'var(--color-log-stderr)', label: 'stderr' },
 }
 
 export default function NodeBackendLogs() {

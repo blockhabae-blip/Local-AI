@@ -697,7 +697,17 @@ export default function Chat() {
   }, [activeChat, isStreaming, sendMessage, updateChatSettings])
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Only Enter (no modifiers, no IME composition) sends.
+    // Shift+Enter, Ctrl+Enter, Meta+Enter, Alt+Enter all fall through to default textarea behavior (newline).
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      !e.nativeEvent?.isComposing &&
+      e.keyCode !== 229
+    ) {
       e.preventDefault()
       handleSend()
     }

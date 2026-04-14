@@ -257,8 +257,8 @@ export default function Models() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 className="page-title">Model Gallery</h1>
-          <p className="page-subtitle">Discover and install AI models for your workflows</p>
+          <h1 className="page-title">Install Models</h1>
+          <p className="page-subtitle">Browse and install AI models from the gallery</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacing-md)', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 'var(--spacing-md)', fontSize: '0.8125rem' }}>
@@ -461,15 +461,14 @@ export default function Models() {
                       {/* Status */}
                       <td>
                         {installing ? (
-                          <div>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)' }}>
-                              <i className="fas fa-spinner fa-spin" /> Installing...
-                            </span>
+                          <div className="inline-install">
+                            <div className="inline-install__row">
+                              <div className="operation-spinner" />
+                              <span className="inline-install__label">Installing{progress > 0 ? ` · ${Math.round(progress)}%` : '...'}</span>
+                            </div>
                             {progress > 0 && (
-                              <div style={{ marginTop: '4px', width: '100%', maxWidth: '120px' }}>
-                                <div style={{ height: 3, background: 'var(--color-bg-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${progress}%`, background: 'var(--color-primary)', borderRadius: 2, transition: 'width 300ms' }} />
-                                </div>
+                              <div className="operation-bar-container" style={{ flex: 'none', width: '120px', marginTop: 4 }}>
+                                <div className="operation-bar" style={{ width: `${progress}%` }} />
                               </div>
                             )}
                           </div>
@@ -478,7 +477,7 @@ export default function Models() {
                             <i className="fas fa-check-circle" /> Installed
                           </span>
                         ) : (
-                          <span className="badge" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
+                          <span className="badge" style={{ background: 'var(--color-surface-sunken)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border-default)' }}>
                             <i className="fas fa-circle" /> Not Installed
                           </span>
                         )}

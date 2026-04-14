@@ -80,7 +80,7 @@ export default function VideoGen() {
     <div className="media-layout">
       <div className="media-controls">
         <div className="page-header">
-          <h1 className="page-title"><i className="fas fa-video" style={{ marginRight: 8, color: 'var(--color-accent)' }} />Video Generation</h1>
+          <h1 className="page-title"><i className="fas fa-video" /> Video Generation</h1>
         </div>
 
         <form onSubmit={handleGenerate}>
@@ -97,10 +97,10 @@ export default function VideoGen() {
             <textarea className="textarea" value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} rows={2} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-sm)' }}>
+          <div className="form-grid-3col">
             <div className="form-group">
               <label className="form-label">Size</label>
-              <select className="model-selector" value={size} onChange={(e) => setSize(e.target.value)} style={{ width: '100%' }}>
+              <select className="input btn-full" value={size} onChange={(e) => setSize(e.target.value)}>
                 {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -118,7 +118,7 @@ export default function VideoGen() {
             <i className="fas fa-chevron-right" /> Advanced
           </div>
           {showAdvanced && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+            <div className="form-grid-3col">
               <div className="form-group"><label className="form-label">Steps</label><input className="input" type="number" value={steps} onChange={(e) => setSteps(e.target.value)} /></div>
               <div className="form-group"><label className="form-label">Seed</label><input className="input" type="number" value={seed} onChange={(e) => setSeed(e.target.value)} /></div>
               <div className="form-group"><label className="form-label">CFG Scale</label><input className="input" type="number" step="0.1" value={cfgScale} onChange={(e) => setCfgScale(e.target.value)} /></div>
@@ -129,13 +129,13 @@ export default function VideoGen() {
             <i className="fas fa-chevron-right" /> Image Inputs
           </div>
           {showImageInputs && (
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <div className="form-grid-2col">
               <div className="form-group"><label className="form-label">Start Image</label><input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStartImage)} className="input" /></div>
               <div className="form-group"><label className="form-label">End Image</label><input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setEndImage)} className="input" /></div>
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%' }}>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
             {loading ? <><LoadingSpinner size="sm" /> Generating...</> : <><i className="fas fa-video" /> Generate Video</>}
           </button>
         </form>

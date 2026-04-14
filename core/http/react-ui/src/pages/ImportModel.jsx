@@ -38,20 +38,20 @@ const URI_FORMATS = [
     ],
   },
   {
-    icon: 'fas fa-box', color: '#22d3ee', title: 'OCI Registry',
+    icon: 'fas fa-box', color: 'var(--color-data-8)', title: 'OCI Registry',
     examples: [
       { prefix: 'oci://', suffix: 'registry.example.com/model:tag', desc: 'OCI container registry' },
       { prefix: 'ocifile://', suffix: '/path/to/image.tar', desc: 'Local OCI tarball file' },
     ],
   },
   {
-    icon: 'fas fa-cube', color: '#818cf8', title: 'Ollama',
+    icon: 'fas fa-cube', color: 'var(--color-data-1)', title: 'Ollama',
     examples: [
       { prefix: 'ollama://', suffix: 'llama2:7b', desc: 'Ollama model format' },
     ],
   },
   {
-    icon: 'fas fa-code', color: '#f472b6', title: 'YAML Configuration Files',
+    icon: 'fas fa-code', color: 'var(--color-data-7)', title: 'YAML Configuration Files',
     examples: [
       { prefix: '', suffix: 'https://example.com/model.yaml', desc: 'Remote YAML config file' },
       { prefix: 'file://', suffix: '/path/to/config.yaml', desc: 'Local YAML config file' },
@@ -437,7 +437,7 @@ export default function ImportModel() {
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <i className="fas fa-code" style={{ color: '#d946ef' }} />
+              <i className="fas fa-code" style={{ color: 'var(--color-data-3)' }} />
               YAML Configuration Editor
             </h2>
             <button className="btn btn-secondary" style={{ fontSize: '0.75rem' }} onClick={() => { navigator.clipboard.writeText(yamlContent); addToast('Copied to clipboard', 'success') }}>

@@ -262,13 +262,13 @@ export default function Backends() {
           marginBottom: 'var(--spacing-md)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: 'var(--spacing-sm) var(--spacing-md)',
-          background: 'var(--color-warning-bg, #fef3cd)',
-          border: '1px solid var(--color-warning, #ffc107)',
+          background: 'var(--color-warning-light)',
+          border: '1px solid var(--color-warning-border)',
           borderRadius: 'var(--radius-md)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-            <i className="fas fa-arrow-up" style={{ color: 'var(--color-warning, #856404)' }} />
-            <span style={{ color: 'var(--color-warning, #856404)', fontWeight: 500, fontSize: '0.875rem' }}>
+            <i className="fas fa-arrow-up" style={{ color: 'var(--color-warning)' }} />
+            <span style={{ color: 'var(--color-warning)', fontWeight: 500, fontSize: 'var(--text-sm)' }}>
               {Object.keys(upgrades).length} backend{Object.keys(upgrades).length > 1 ? 's have' : ' has'} updates available
             </span>
           </div>
@@ -447,20 +447,18 @@ export default function Backends() {
                     {/* Status */}
                     <td>
                       {isProcessing ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                          <div style={{
-                            width: 80, height: 6, background: 'var(--color-bg-tertiary)',
-                            borderRadius: 3, overflow: 'hidden',
-                          }}>
-                            <div style={{
-                              width: `${op.progress || 0}%`, height: '100%',
-                              background: 'var(--color-primary)',
-                              borderRadius: 3, transition: 'width 300ms',
-                            }} />
+                        <div className="inline-install">
+                          <div className="inline-install__row">
+                            <div className="operation-spinner" />
+                            <span className="inline-install__label">
+                              {op.isDeletion ? 'Deleting...' : op.isQueued ? 'Queued' : `Installing${op.progress > 0 ? ` · ${Math.round(op.progress)}%` : '...'}`}
+                            </span>
                           </div>
-                          <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>
-                            {op.isDeletion ? 'Deleting...' : op.isQueued ? 'Queued' : 'Installing...'}
-                          </span>
+                          {op.progress > 0 && (
+                            <div className="operation-bar-container" style={{ flex: 'none', width: '120px', marginTop: 4 }}>
+                              <div className="operation-bar" style={{ width: `${op.progress}%` }} />
+                            </div>
+                          )}
                         </div>
                       ) : b.installed ? (
                         <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -468,14 +466,14 @@ export default function Backends() {
                             <i className="fas fa-check" style={{ fontSize: '0.5rem', marginRight: 2 }} /> Installed
                           </span>
                           {upgrades[b.name] && (
-                            <span className="badge" style={{ fontSize: '0.625rem', background: '#fef3cd', color: '#856404' }}>
+                            <span className="badge" style={{ fontSize: '0.625rem', background: 'var(--color-warning-light)', color: 'var(--color-warning)' }}>
                               <i className="fas fa-arrow-up" style={{ fontSize: '0.5rem', marginRight: 2 }} />
                               {upgrades[b.name].available_version ? `v${upgrades[b.name].available_version}` : 'Update'}
                             </span>
                           )}
                         </div>
                       ) : (
-                        <span className="badge" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>
+                        <span className="badge" style={{ background: 'var(--color-surface-sunken)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border-default)' }}>
                           <i className="fas fa-circle" style={{ fontSize: '0.5rem', marginRight: 2 }} /> Not Installed
                         </span>
                       )}
