@@ -2200,6 +2200,211 @@
     - filename: mmproj/mmproj-Qwen3-VL-8B-Thinking-F16.gguf
       sha256: 64d5be3f16fb91cfb451155fe4745266e2169ccbe1f29f57bfab27fb7fec389e
       uri: huggingface://unsloth/Qwen3-VL-8B-Thinking-GGUF/mmproj-F16.gguf
+- &ggmlorg-llamacpp
+  url: "github:mudler/LocalAI/gallery/virtual.yaml@master"
+  icon: https://cdn-avatars.huggingface.co/v1/production/uploads/620760a26e3b7210c2ff1943/-s1gyJfvbE1RgO5iBeNOi.png
+  license: apache-2.0
+  name: "qwen3-omni-30b-a3b-instruct"
+  urls:
+    - https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct
+    - https://huggingface.co/ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - image-to-text
+    - audio-to-text
+    - multimodal
+    - cpu
+    - qwen
+    - qwen3
+    - omni
+  description: |
+    Qwen3-Omni is the natively end-to-end multilingual omni-modal foundation model. It processes text, images, audio, and video, and delivers real-time streaming responses in both text and natural speech. This GGUF build runs on llama.cpp with the bundled mmproj for multimodal inputs.
+  overrides:
+    backend: llama-cpp
+    mmproj: mmproj-Qwen3-Omni-30B-A3B-Instruct-Q8_0.gguf
+    parameters:
+      model: Qwen3-Omni-30B-A3B-Instruct-Q4_K_M.gguf
+    template:
+      use_tokenizer_template: true
+    options:
+      - use_jinja:true
+  files:
+    - filename: Qwen3-Omni-30B-A3B-Instruct-Q4_K_M.gguf
+      sha256: d9e2876556e7873e02c0359f832432ee2d67ab7dd0cee3efe0f77fd7a1f4dd85
+      uri: huggingface://ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF/Qwen3-Omni-30B-A3B-Instruct-Q4_K_M.gguf
+    - filename: mmproj-Qwen3-Omni-30B-A3B-Instruct-Q8_0.gguf
+      sha256: 1104376db833f1e89c84834144ac3863340c2cd1ddaeddb39cb0247fb5c20c8d
+      uri: huggingface://ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF/mmproj-Qwen3-Omni-30B-A3B-Instruct-Q8_0.gguf
+- !!merge <<: *ggmlorg-llamacpp
+  name: "qwen3-omni-30b-a3b-thinking"
+  urls:
+    - https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Thinking
+    - https://huggingface.co/ggml-org/Qwen3-Omni-30B-A3B-Thinking-GGUF
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - image-to-text
+    - audio-to-text
+    - multimodal
+    - cpu
+    - qwen
+    - qwen3
+    - omni
+    - thinking
+    - reasoning
+  description: |
+    Qwen3-Omni-30B-A3B-Thinking is the reasoning-enhanced variant of Qwen3-Omni, a natively end-to-end multilingual omni-modal foundation model. It processes text, images, and audio and produces chain-of-thought reasoning before the final answer. This GGUF build runs on llama.cpp with the bundled mmproj.
+  overrides:
+    backend: llama-cpp
+    mmproj: mmproj-Qwen3-Omni-30B-A3B-Thinking-Q8_0.gguf
+    parameters:
+      model: Qwen3-Omni-30B-A3B-Thinking-Q4_K_M.gguf
+    template:
+      use_tokenizer_template: true
+    options:
+      - use_jinja:true
+  files:
+    - filename: Qwen3-Omni-30B-A3B-Thinking-Q4_K_M.gguf
+      sha256: afdaeff6f23c740429aadb3fa180f9d53b78278fe0d331b594b0b71bd9bf4835
+      uri: huggingface://ggml-org/Qwen3-Omni-30B-A3B-Thinking-GGUF/Qwen3-Omni-30B-A3B-Thinking-Q4_K_M.gguf
+    - filename: mmproj-Qwen3-Omni-30B-A3B-Thinking-Q8_0.gguf
+      sha256: 2bd5459571f8230a0c251d3d0dd36267753f0800ed145449a34f220a31f93898
+      uri: huggingface://ggml-org/Qwen3-Omni-30B-A3B-Thinking-GGUF/mmproj-Qwen3-Omni-30B-A3B-Thinking-Q8_0.gguf
+- !!merge <<: *ggmlorg-llamacpp
+  name: "qwen3-asr-0.6b"
+  urls:
+    - https://huggingface.co/Qwen/Qwen3-ASR
+    - https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - audio-to-text
+    - asr
+    - cpu
+    - qwen
+    - qwen3
+  description: |
+    Qwen3-ASR 0.6B is a compact automatic speech recognition model from the Qwen3 family, distributed as a GGUF for llama.cpp. It accepts audio input through the paired mmproj and transcribes it to text, supporting multilingual speech.
+  overrides:
+    backend: llama-cpp
+    mmproj: mmproj-Qwen3-ASR-0.6B-Q8_0.gguf
+    parameters:
+      model: Qwen3-ASR-0.6B-Q8_0.gguf
+    template:
+      use_tokenizer_template: true
+    options:
+      - use_jinja:true
+  files:
+    - filename: Qwen3-ASR-0.6B-Q8_0.gguf
+      sha256: bca259818b50ca7c4c05e9bdb35a5dc04fa039653a6d6f3f0f331f96f6aa1971
+      uri: huggingface://ggml-org/Qwen3-ASR-0.6B-GGUF/Qwen3-ASR-0.6B-Q8_0.gguf
+    - filename: mmproj-Qwen3-ASR-0.6B-Q8_0.gguf
+      sha256: 41a342b5e4c514e968cb756de6cd1b7be39eff43c44c57a2ef5fc6522e36603d
+      uri: huggingface://ggml-org/Qwen3-ASR-0.6B-GGUF/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf
+- !!merge <<: *ggmlorg-llamacpp
+  name: "qwen3-asr-1.7b"
+  urls:
+    - https://huggingface.co/Qwen/Qwen3-ASR
+    - https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - audio-to-text
+    - asr
+    - cpu
+    - qwen
+    - qwen3
+  description: |
+    Qwen3-ASR 1.7B is the larger automatic speech recognition model from the Qwen3 family, distributed as a GGUF for llama.cpp. It accepts audio input through the paired mmproj and produces higher-quality multilingual transcriptions than the 0.6B variant.
+  overrides:
+    backend: llama-cpp
+    mmproj: mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
+    parameters:
+      model: Qwen3-ASR-1.7B-Q8_0.gguf
+    template:
+      use_tokenizer_template: true
+    options:
+      - use_jinja:true
+  files:
+    - filename: Qwen3-ASR-1.7B-Q8_0.gguf
+      sha256: 58e22d0532d4eacaf034cfac17a6fed159f37c41390c710186783be439d1fc57
+      uri: huggingface://ggml-org/Qwen3-ASR-1.7B-GGUF/Qwen3-ASR-1.7B-Q8_0.gguf
+    - filename: mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
+      sha256: 46c1d533af3f354ceb37ce855dbceff7da7fa7cf1e6a523df3b13440bd164c0d
+      uri: huggingface://ggml-org/Qwen3-ASR-1.7B-GGUF/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
+- !!merge <<: *ggmlorg-llamacpp
+  name: "glm-ocr"
+  icon: https://huggingface.co/zai-org.png
+  license: mit
+  urls:
+    - https://huggingface.co/zai-org/GLM-4.1V-9B-Thinking
+    - https://huggingface.co/ggml-org/GLM-OCR-GGUF
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - image-to-text
+    - ocr
+    - multimodal
+    - cpu
+    - glm
+  description: |
+    GLM-OCR is a vision-language model specialized for optical character recognition and document understanding, built on the GLM architecture. This GGUF build runs on llama.cpp with the bundled mmproj.
+  overrides:
+    backend: llama-cpp
+    mmproj: mmproj-GLM-OCR-Q8_0.gguf
+    parameters:
+      model: GLM-OCR-Q8_0.gguf
+    template:
+      use_tokenizer_template: true
+    options:
+      - use_jinja:true
+  files:
+    - filename: GLM-OCR-Q8_0.gguf
+      sha256: 45bc244a6446aff850521dc41f18bc8d7105ad5f0c2c8c28af04e7cc4f4d50b1
+      uri: huggingface://ggml-org/GLM-OCR-GGUF/GLM-OCR-Q8_0.gguf
+    - filename: mmproj-GLM-OCR-Q8_0.gguf
+      sha256: 9c4b58e33e316ed142eb5dcb41abec3844d3e6e5dc361ffb782c3fa9d175141f
+      uri: huggingface://ggml-org/GLM-OCR-GGUF/mmproj-GLM-OCR-Q8_0.gguf
+- !!merge <<: *ggmlorg-llamacpp
+  name: "deepseek-ocr"
+  icon: https://huggingface.co/deepseek-ai.png
+  license: mit
+  urls:
+    - https://huggingface.co/deepseek-ai/DeepSeek-OCR
+    - https://huggingface.co/ggml-org/DeepSeek-OCR-GGUF
+  tags:
+    - llm
+    - gguf
+    - gpu
+    - image-to-text
+    - ocr
+    - multimodal
+    - cpu
+    - deepseek
+  description: |
+    DeepSeek-OCR is a vision-language model from DeepSeek AI specialized for optical character recognition and document understanding. This GGUF build runs on llama.cpp with the bundled mmproj.
+  overrides:
+    backend: llama-cpp
+    mmproj: mmproj-DeepSeek-OCR-Q8_0.gguf
+    parameters:
+      model: DeepSeek-OCR-Q8_0.gguf
+    template:
+      use_tokenizer_template: true
+    options:
+      - use_jinja:true
+  files:
+    - filename: DeepSeek-OCR-Q8_0.gguf
+      sha256: 81ede3e256230707dccf7fa052570c3a939d57db99de655f43cbb1a830d14d92
+      uri: huggingface://ggml-org/DeepSeek-OCR-GGUF/DeepSeek-OCR-Q8_0.gguf
+    - filename: mmproj-DeepSeek-OCR-Q8_0.gguf
+      sha256: 786c9b5159898de3d1d94a102836df559fed0bcf09f41a32f62c3219b0e278e0
+      uri: huggingface://ggml-org/DeepSeek-OCR-GGUF/mmproj-DeepSeek-OCR-Q8_0.gguf
 - &jamba
   icon: https://cdn-avatars.huggingface.co/v1/production/uploads/65e60c0ed5313c06372446ff/QwehUHgP2HtVAMW5MzJ2j.png
   name: "ai21labs_ai21-jamba-reasoning-3b"
