@@ -824,6 +824,19 @@ func RegisterUIAPIRoutes(app *echo.Echo, cl *config.ModelConfigLoader, ml *model
 			})
 		}
 
+		// Collect concrete backend names that are referenced by any meta backend's
+		// CapabilitiesMap. These are the per-capability variants the UI hides by
+		// default behind "Show all" (the meta backend is the preferred entry).
+		aliasedByMeta := make(map[string]bool)
+		for _, b := range backends {
+			if !b.IsMeta() {
+				continue
+			}
+			for _, concreteName := range b.CapabilitiesMap {
+				aliasedByMeta[concreteName] = true
+			}
+		}
+
 		// Use the BackendManager's list to determine installed status.
 		// In standalone mode this checks the local filesystem; in distributed
 		// mode it aggregates from all healthy worker nodes.
@@ -940,6 +953,7 @@ func RegisterUIAPIRoutes(app *echo.Echo, cl *config.ModelConfigLoader, ml *model
 				"jobID":         jobID,
 				"isDeletion":    isDeletionOp,
 				"isMeta":        b.IsMeta(),
+				"isAlias":       aliasedByMeta[b.Name],
 				"isDevelopment": b.IsDevelopment(devSuffix),
 			})
 		}

@@ -74,9 +74,11 @@ export default function Backends() {
   const filteredBackends = (() => {
     let result = allBackends
 
-    // Show only meta backends unless "Show all" is toggled
+    // Hide concrete variants that are aliased by a meta backend unless
+    // "Show all" is toggled. Standalone backends (no meta referencing them)
+    // stay visible even when they don't declare capabilities themselves.
     if (!showAllBackends) {
-      result = result.filter(b => b.isMeta)
+      result = result.filter(b => b.isMeta || !b.isAlias)
     }
 
     // Hide development backends unless toggled on
