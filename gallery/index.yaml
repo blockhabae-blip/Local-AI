@@ -15214,6 +15214,12 @@
       model: wan2.1-i2v-14b-480p-Q4_K_M.gguf
     options:
       - "clip_vision_path:clip_vision_h.safetensors"
+      - "diffusion_model"
+      - "vae_decode_only:false"
+      - "sampler:euler"
+      - "flow_shift:3.0"
+      - "t5xxl_path:umt5-xxl-encoder-Q8_0.gguf"
+      - "vae_path:wan_2.1_vae.safetensors"
   files:
     - filename: "wan2.1-i2v-14b-480p-Q4_K_M.gguf"
       uri: "huggingface://city96/Wan2.1-I2V-14B-480P-gguf/wan2.1-i2v-14b-480p-Q4_K_M.gguf"
