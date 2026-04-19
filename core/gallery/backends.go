@@ -394,6 +394,23 @@ type SystemBackend struct {
 	Metadata         *BackendMetadata
 	UpgradeAvailable bool   `json:"upgrade_available,omitempty"`
 	AvailableVersion string `json:"available_version,omitempty"`
+	// Nodes holds per-node attribution in distributed mode. Empty in single-node.
+	// Each entry describes a node that has this backend installed, with the
+	// version/digest it reports. Lets the UI surface drift and per-node status.
+	Nodes []NodeBackendRef `json:"nodes,omitempty"`
+}
+
+// NodeBackendRef describes one node's view of an installed backend. Used both
+// for per-node attribution in the UI and for drift detection during upgrade
+// checks (a cluster with mismatched versions/digests is flagged upgradeable).
+type NodeBackendRef struct {
+	NodeID      string `json:"node_id"`
+	NodeName    string `json:"node_name"`
+	NodeStatus  string `json:"node_status"` // healthy | unhealthy | offline | draining | pending
+	Version     string `json:"version,omitempty"`
+	Digest      string `json:"digest,omitempty"`
+	URI         string `json:"uri,omitempty"`
+	InstalledAt string `json:"installed_at,omitempty"`
 }
 
 type SystemBackends map[string]SystemBackend
