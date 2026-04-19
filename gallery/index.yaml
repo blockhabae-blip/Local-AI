@@ -15186,10 +15186,10 @@
     - gpu
   overrides:
     parameters:
-      model: wan2.1-t2v-1.3B-Q8_0.gguf
+      model: wan2.1_t2v_1.3b-q8_0.gguf
   files:
-    - filename: "wan2.1-t2v-1.3B-Q8_0.gguf"
-      uri: "huggingface://calcuis/wan-gguf/wan2.1-t2v-1.3B-Q8_0.gguf"
+    - filename: "wan2.1_t2v_1.3b-q8_0.gguf"
+      uri: "huggingface://calcuis/wan-gguf/wan2.1_t2v_1.3b-q8_0.gguf"
     - filename: "wan_2.1_vae.safetensors"
       uri: "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
     - filename: "umt5-xxl-encoder-Q8_0.gguf"
