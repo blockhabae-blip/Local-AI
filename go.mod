@@ -35,7 +35,7 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/modelcontextprotocol/go-sdk v1.4.1
+	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/mudler/cogito v0.9.5-0.20260315222927-63abdec7189b
 	github.com/mudler/edgevpn v0.31.1
 	github.com/mudler/go-processmanager v0.1.0
