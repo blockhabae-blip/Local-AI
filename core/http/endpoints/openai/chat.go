@@ -147,6 +147,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 		result := ""
 		lastEmittedCount := 0
 		sentInitialRole := false
+		sentReasoning := false
 		hasChatDeltaToolCalls := false
 		hasChatDeltaContent := false
 
@@ -190,6 +191,7 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 					}},
 					Object: "chat.completion.chunk",
 				}
+				sentReasoning = true
 			}
 
 			// Stream content deltas (cleaned of reasoning tags) while no tool calls
@@ -363,7 +365,12 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 			functionResults = functions.ParseFunctionCall(cleanedResult, config.FunctionsConfig)
 		}
 		xlog.Debug("[ChatDeltas] final tool call decision", "tool_calls", len(functionResults), "text_content", *textContentToReturn)
-		noActionToRun := len(functionResults) > 0 && functionResults[0].Name == noAction || len(functionResults) == 0
+		// noAction is a sentinel "just answer" pseudo-function — not a real
+		// tool call. Scan the whole slice rather than only index 0 so we
+		// don't drop a real tool call that happens to follow a noAction
+		// entry, and so the default branch isn't entered with only noAction
+		// entries to emit as tool_calls.
+		noActionToRun := !hasRealCall(functionResults, noAction)
 
 		switch {
 		case noActionToRun:
@@ -377,108 +384,31 @@ func ChatEndpoint(cl *config.ModelConfigLoader, ml *model.ModelLoader, evaluator
 				usage.TimingPromptProcessing = tokenUsage.TimingPromptProcessing
 			}
 
-			if sentInitialRole {
-				// Content was already streamed during the callback — just emit usage.
-				delta := &schema.Message{}
-				if reasoning != "" && extractor.Reasoning() == "" {
-					delta.Reasoning = &reasoning
+			var result string
+			if !sentInitialRole {
+				var hqErr error
+				result, hqErr = handleQuestion(config, functionResults, extractor.CleanedContent(), prompt)
+				if hqErr != nil {
+					xlog.Error("error handling question", "error", hqErr)
+					return hqErr
 				}
-				responses <- schema.OpenAIResponse{
-					ID: id, Created: created, Model: req.Model,
-					Choices: []schema.Choice{{Delta: delta, Index: 0}},
-					Object:  "chat.completion.chunk",
-					Usage:   usage,
-				}
-			} else {
-				// Content was NOT streamed — send everything at once (fallback).
-				responses <- schema.OpenAIResponse{
-					ID: id, Created: created, Model: req.Model,
-					Choices: []schema.Choice{{Delta: &schema.Message{Role: "assistant"}, Index: 0}},
-					Object:  "chat.completion.chunk",
-				}
-
-				result, err := handleQuestion(config, functionResults, extractor.CleanedContent(), prompt)
-				if err != nil {
-					xlog.Error("error handling question", "error", err)
-					return err
-				}
-
-				delta := &schema.Message{Content: &result}
-				if reasoning != "" {
-					delta.Reasoning = &reasoning
-				}
-				responses <- schema.OpenAIResponse{
-					ID: id, Created: created, Model: req.Model,
-					Choices: []schema.Choice{{Delta: delta, Index: 0}},
-					Object:  "chat.completion.chunk",
-					Usage:   usage,
-				}
+			}
+			for _, chunk := range buildNoActionFinalChunks(
+				id, req.Model, created,
+				sentInitialRole, sentReasoning,
+				result, reasoning, usage,
+			) {
+				responses <- chunk
 			}
 
 		default:
-			for i, ss := range functionResults {
-				name, args := ss.Name, ss.Arguments
-				toolCallID := ss.ID
-				if toolCallID == "" {
-					toolCallID = id
-				}
-
-				if i < lastEmittedCount {
-					// Already emitted during streaming by the incremental
-					// JSON/XML parser — skip to avoid duplicate tool calls.
-					continue
-				}
-
-				// Tool call not yet emitted — send name + args (two chunks).
-				initialMessage := schema.OpenAIResponse{
-					ID:      id,
-					Created: created,
-					Model:   req.Model,
-					Choices: []schema.Choice{{
-						Delta: &schema.Message{
-							Role: "assistant",
-							ToolCalls: []schema.ToolCall{
-								{
-									Index: i,
-									ID:    toolCallID,
-									Type:  "function",
-									FunctionCall: schema.FunctionCall{
-										Name: name,
-									},
-								},
-							},
-						},
-						Index:        0,
-						FinishReason: nil,
-					}},
-					Object: "chat.completion.chunk",
-				}
-				responses <- initialMessage
-
-				responses <- schema.OpenAIResponse{
-					ID:      id,
-					Created: created,
-					Model:   req.Model,
-					Choices: []schema.Choice{{
-						Delta: &schema.Message{
-							Role:    "assistant",
-							Content: textContentToReturn,
-							ToolCalls: []schema.ToolCall{
-								{
-									Index: i,
-									ID:    toolCallID,
-									Type:  "function",
-									FunctionCall: schema.FunctionCall{
-										Arguments: args,
-									},
-								},
-							},
-						},
-						Index:        0,
-						FinishReason: nil,
-					}},
-					Object: "chat.completion.chunk",
-				}
+			for _, chunk := range buildDeferredToolCallChunks(
+				id, req.Model, created,
+				functionResults, lastEmittedCount,
+				sentInitialRole, *textContentToReturn,
+				sentReasoning, reasoning,
+			) {
+				responses <- chunk
 			}
 		}
 
