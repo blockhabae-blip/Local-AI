@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.1
 	github.com/charmbracelet/glamour v1.0.0
-	github.com/containerd/containerd v1.7.30
+	github.com/containerd/containerd v1.7.31
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/ebitengine/purego v0.10.0
