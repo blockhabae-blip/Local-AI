@@ -3,6 +3,7 @@ package localai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,6 +38,31 @@ func ImportModelURIEndpoint(cl *config.ModelConfigLoader, appConfig *config.Appl
 
 		modelConfig, err := importers.DiscoverModelConfig(input.URI, input.Preferences)
 		if err != nil {
+			var amb *importers.AmbiguousImportError
+			if errors.As(err, &amb) {
+				// Fall back to empty slice so JSON always renders an array,
+				// not null — keeps the UI code a bit simpler.
+				candidates := amb.Candidates
+				if candidates == nil {
+					candidates = []string{}
+				}
+				return c.JSON(http.StatusBadRequest, map[string]any{
+					"error":      "ambiguous import",
+					"detail":     amb.Error(),
+					"modality":   amb.Modality,
+					"candidates": candidates,
+					"hint":       "Pass preferences.backend to pick one of the candidates.",
+				})
+			}
+			if errors.Is(err, importers.ErrAmbiguousImport) {
+				return c.JSON(http.StatusBadRequest, map[string]any{
+					"error":      "ambiguous import",
+					"detail":     err.Error(),
+					"modality":   "",
+					"candidates": []string{},
+					"hint":       "Pass preferences.backend to pick one of the candidates.",
+				})
+			}
 			return fmt.Errorf("failed to discover model config: %w", err)
 		}
 

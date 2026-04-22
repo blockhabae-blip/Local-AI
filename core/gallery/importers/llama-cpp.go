@@ -15,9 +15,27 @@ import (
 	"go.yaml.in/yaml/v2"
 )
 
-var _ Importer = &LlamaCPPImporter{}
+var (
+	_ Importer                   = &LlamaCPPImporter{}
+	_ AdditionalBackendsProvider = &LlamaCPPImporter{}
+)
 
 type LlamaCPPImporter struct{}
+
+func (i *LlamaCPPImporter) Name() string     { return "llama-cpp" }
+func (i *LlamaCPPImporter) Modality() string { return "text" }
+func (i *LlamaCPPImporter) AutoDetects() bool { return true }
+
+// AdditionalBackends advertises drop-in replacements that share the
+// llama-cpp detection logic. They are preference-only: selecting one
+// from the import form swaps the emitted YAML backend field but reuses
+// the llama-cpp Match/Import pipeline.
+func (i *LlamaCPPImporter) AdditionalBackends() []KnownBackendEntry {
+	return []KnownBackendEntry{
+		{Name: "ik-llama-cpp", Modality: "text", Description: "GGUF drop-in replacement for llama-cpp with ik-quants"},
+		{Name: "turboquant", Modality: "text", Description: "GGUF drop-in replacement for llama-cpp with TurboQuant optimizations"},
+	}
+}
 
 func (i *LlamaCPPImporter) Match(details Details) bool {
 	preferences, err := details.Preferences.MarshalJSON()
@@ -101,12 +119,25 @@ func (i *LlamaCPPImporter) Import(details Details) (gallery.ModelConfig, error) 
 
 	embeddings, _ := preferencesMap["embeddings"].(string)
 
+	// Honour drop-in replacement preferences. Only the curated names
+	// advertised via AdditionalBackends() are accepted; anything else
+	// (including "llama-cpp" itself, or an unknown value) keeps the
+	// default backend field so arbitrary input can't leak through. See
+	// the AdditionalBackends method for the canonical list.
+	backend := "llama-cpp"
+	if b, ok := preferencesMap["backend"].(string); ok {
+		switch b {
+		case "ik-llama-cpp", "turboquant":
+			backend = b
+		}
+	}
+
 	modelConfig := config.ModelConfig{
 		Name:                name,
 		Description:         description,
 		KnownUsecaseStrings: []string{"chat"},
 		Options:             []string{"use_jinja:true"},
-		Backend:             "llama-cpp",
+		Backend:             backend,
 		TemplateConfig: config.TemplateConfig{
 			UseTokenizerTemplate: true,
 		},
