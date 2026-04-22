@@ -168,6 +168,43 @@
     nvidia-cuda-13: "cuda13-rfdetr"
     nvidia-cuda-12: "cuda12-rfdetr"
     nvidia-l4t-cuda-12: "nvidia-l4t-arm64-rfdetr"
+- &insightface
+  name: "insightface"
+  alias: "insightface"
+  # Upstream insightface library is MIT. The pretrained model packs
+  # (buffalo_l, buffalo_s, antelopev2) are released for NON-COMMERCIAL
+  # research use only. The backend image also pre-bakes OpenCV Zoo
+  # YuNet + SFace (Apache 2.0) for commercial use. Pick the engine
+  # via model-gallery entries (insightface-buffalo-l / insightface-opencv
+  # / insightface-buffalo-s) or set `options` in your model YAML.
+  license: "mixed"
+  description: |
+    Face recognition backend powered by `insightface` (ONNX Runtime).
+    Provides face verification (/v1/face/verify), face analysis
+    (/v1/face/analyze), face embedding (/v1/embeddings), face
+    detection (/v1/detection), and 1:N identification
+    (/v1/face/{register,identify,forget}).
+    Ships two engines in a single image: one that drives the insightface
+    model packs (buffalo_l/s/m/sc, antelopev2 — non-commercial research
+    use only) and one that drives OpenCV Zoo's YuNet + SFace pair
+    (Apache 2.0 — commercial-safe). Select via `options: ["engine:..."]`
+    in your model YAML, or install one of the ready-made model-gallery
+    entries under the `insightface-*` prefix.
+    The backend image contains only code and Python deps; all model
+    weights are managed by LocalAI's gallery download mechanism.
+  urls:
+    - https://github.com/deepinsight/insightface
+    - https://github.com/opencv/opencv_zoo
+  tags:
+    - face-recognition
+    - face-verification
+    - face-embedding
+    - gpu
+    - cpu
+  capabilities:
+    default: "cpu-insightface"
+    nvidia: "cuda12-insightface"
+    nvidia-cuda-12: "cuda12-insightface"
 - &sam3cpp
   name: "sam3-cpp"
   alias: "sam3-cpp"
@@ -3709,3 +3746,30 @@
   uri: "quay.io/go-skynet/local-ai-backends:latest-metal-darwin-arm64-llama-cpp-quantization"
   mirrors:
     - localai/localai-backends:latest-metal-darwin-arm64-llama-cpp-quantization
+# insightface (face recognition) — development and concrete image entries
+- !!merge <<: *insightface
+  name: "insightface-development"
+  capabilities:
+    default: "cpu-insightface-development"
+    nvidia: "cuda12-insightface-development"
+    nvidia-cuda-12: "cuda12-insightface-development"
+- !!merge <<: *insightface
+  name: "cpu-insightface"
+  uri: "quay.io/go-skynet/local-ai-backends:latest-cpu-insightface"
+  mirrors:
+    - localai/localai-backends:latest-cpu-insightface
+- !!merge <<: *insightface
+  name: "cuda12-insightface"
+  uri: "quay.io/go-skynet/local-ai-backends:latest-gpu-nvidia-cuda-12-insightface"
+  mirrors:
+    - localai/localai-backends:latest-gpu-nvidia-cuda-12-insightface
+- !!merge <<: *insightface
+  name: "cpu-insightface-development"
+  uri: "quay.io/go-skynet/local-ai-backends:master-cpu-insightface"
+  mirrors:
+    - localai/localai-backends:master-cpu-insightface
+- !!merge <<: *insightface
+  name: "cuda12-insightface-development"
+  uri: "quay.io/go-skynet/local-ai-backends:master-gpu-nvidia-cuda-12-insightface"
+  mirrors:
+    - localai/localai-backends:master-gpu-nvidia-cuda-12-insightface

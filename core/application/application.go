@@ -7,16 +7,27 @@ import (
 	"sync/atomic"
 	"time"
 
+	corebackend "github.com/mudler/LocalAI/core/backend"
 	"github.com/mudler/LocalAI/core/config"
 	mcpTools "github.com/mudler/LocalAI/core/http/endpoints/mcp"
 	"github.com/mudler/LocalAI/core/services/agentpool"
+	"github.com/mudler/LocalAI/core/services/facerecognition"
 	"github.com/mudler/LocalAI/core/services/galleryop"
 	"github.com/mudler/LocalAI/core/services/nodes"
 	"github.com/mudler/LocalAI/core/templates"
+	pkggrpc "github.com/mudler/LocalAI/pkg/grpc"
 	"github.com/mudler/LocalAI/pkg/model"
 	"github.com/mudler/xlog"
 	"gorm.io/gorm"
 )
+
+// faceEmbeddingDim is the expected dimension for face embeddings.
+// Set to 0 so the Registry accepts whatever dim the loaded recognizer
+// produces — ArcFace R50 is 512-d, MBF is 512-d, SFace is 128-d, and
+// the insightface backend can load any of them via LoadModel options.
+// Locking this to a specific value would force a single recognizer
+// family per deployment; we keep the door open instead.
+const faceEmbeddingDim = 0
 
 type Application struct {
 	backendLoader      *config.ModelConfigLoader
@@ -27,6 +38,7 @@ type Application struct {
 	galleryService     *galleryop.GalleryService
 	agentJobService    *agentpool.AgentJobService
 	agentPoolService   atomic.Pointer[agentpool.AgentPoolService]
+	faceRegistry       facerecognition.Registry
 	authDB             *gorm.DB
 	watchdogMutex      sync.Mutex
 	watchdogStop       chan bool
@@ -50,12 +62,23 @@ func newApplication(appConfig *config.ApplicationConfig) *Application {
 		mcpTools.CloseMCPSessions(modelName)
 	})
 
-	return &Application{
+	app := &Application{
 		backendLoader:      config.NewModelConfigLoader(appConfig.SystemState.Model.ModelsPath),
 		modelLoader:        ml,
 		applicationConfig:  appConfig,
 		templatesEvaluator: templates.NewEvaluator(appConfig.SystemState.Model.ModelsPath),
 	}
+
+	// Face-recognition registry backed by LocalAI's built-in vector store.
+	// The resolver closes over the ModelLoader so the Registry stays
+	// decoupled from loader plumbing; swapping in a postgres-backed
+	// implementation later is a single construction change here.
+	faceStoreResolver := func(_ context.Context, storeName string) (pkggrpc.Backend, error) {
+		return corebackend.StoreBackend(ml, appConfig, storeName, "")
+	}
+	app.faceRegistry = facerecognition.NewStoreRegistry(faceStoreResolver, "", faceEmbeddingDim)
+
+	return app
 }
 
 func (a *Application) ModelConfigLoader() *config.ModelConfigLoader {
@@ -97,6 +120,14 @@ func (a *Application) distributedDB() *gorm.DB {
 
 func (a *Application) AgentPoolService() *agentpool.AgentPoolService {
 	return a.agentPoolService.Load()
+}
+
+// FaceRegistry returns the face-recognition registry used for 1:N
+// identification. The current implementation is backed by the
+// in-memory local-store backend; see core/services/facerecognition
+// for the interface and the postgres TODO.
+func (a *Application) FaceRegistry() facerecognition.Registry {
+	return a.faceRegistry
 }
 
 // AuthDB returns the auth database connection, or nil if auth is not enabled.
