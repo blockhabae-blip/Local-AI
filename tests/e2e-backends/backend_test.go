@@ -88,6 +88,9 @@ const (
 	capFaceEmbed     = "face_embed"
 	capFaceVerify    = "face_verify"
 	capFaceAnalyze   = "face_analyze"
+	capVoiceEmbed    = "voice_embed"
+	capVoiceVerify   = "voice_verify"
+	capVoiceAnalyze  = "voice_analyze"
 
 	defaultPrompt             = "The capital of France is"
 	streamPrompt              = "Once upon a time"
@@ -137,6 +140,14 @@ var _ = Describe("Backend container", Ordered, func() {
 		faceFile1 string
 		faceFile2 string
 		faceFile3 string
+		// Voice fixtures: two clips of the same speaker + one different speaker.
+		voiceFile1 string
+		voiceFile2 string
+		voiceFile3 string
+		// voiceVerifyCeiling is the upper-bound cosine distance for a
+		// same-speaker pair; varies with the recognizer (ECAPA-TDNN
+		// runs close to 0.2, WeSpeaker around 0.3).
+		voiceVerifyCeiling float32
 		// verifyCeiling is the upper-bound cosine distance for a
 		// same-person pair; each model configuration can override it via
 		// BACKEND_TEST_VERIFY_DISTANCE_CEILING because SFace's distance
@@ -217,6 +228,13 @@ var _ = Describe("Backend container", Ordered, func() {
 		faceFile2 = resolveFaceFixture(workDir, "BACKEND_TEST_FACE_IMAGE_2", "face_a_2.jpg")
 		faceFile3 = resolveFaceFixture(workDir, "BACKEND_TEST_FACE_IMAGE_3", "face_b.jpg")
 		verifyCeiling = envFloat32("BACKEND_TEST_VERIFY_DISTANCE_CEILING", defaultVerifyDistanceCeil)
+
+		// Voice fixtures for the voice-recognition specs. Same resolver
+		// as faces — the helper is content-agnostic.
+		voiceFile1 = resolveFaceFixture(workDir, "BACKEND_TEST_VOICE_AUDIO_1", "voice_a_1.wav")
+		voiceFile2 = resolveFaceFixture(workDir, "BACKEND_TEST_VOICE_AUDIO_2", "voice_a_2.wav")
+		voiceFile3 = resolveFaceFixture(workDir, "BACKEND_TEST_VOICE_AUDIO_3", "voice_b.wav")
+		voiceVerifyCeiling = envFloat32("BACKEND_TEST_VOICE_VERIFY_DISTANCE_CEILING", 0.4)
 
 		// Pick a free port and launch the backend.
 		port, err := freeport.GetFreePort()
@@ -667,6 +685,107 @@ var _ = Describe("Backend container", Ordered, func() {
 			Expect(f.GetDominantGender()).To(BeElementOf("Man", "Woman"))
 		}
 		GinkgoWriter.Printf("face_analyze: %d faces\n", len(res.GetFaces()))
+	})
+
+	// ─── voice (speaker) recognition specs ──────────────────────────────
+
+	It("produces speaker embeddings via VoiceEmbed", func() {
+		if !caps[capVoiceEmbed] {
+			Skip("voice_embed capability not enabled")
+		}
+		Expect(voiceFile1).NotTo(BeEmpty(), "BACKEND_TEST_VOICE_AUDIO_1_FILE or _URL must be set")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		res, err := client.VoiceEmbed(ctx, &pb.VoiceEmbedRequest{Audio: voiceFile1})
+		Expect(err).NotTo(HaveOccurred())
+		vec := res.GetEmbedding()
+		Expect(vec).NotTo(BeEmpty(), "VoiceEmbed returned empty vector")
+		GinkgoWriter.Printf("voice_embed: dim=%d\n", len(vec))
+	})
+
+	It("verifies speakers via VoiceVerify", func() {
+		if !caps[capVoiceVerify] {
+			Skip("voice_verify capability not enabled")
+		}
+		Expect(voiceFile1).NotTo(BeEmpty(), "BACKEND_TEST_VOICE_AUDIO_1_FILE or _URL must be set")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		// Same clip twice — expected verified=true with very small distance.
+		same, err := client.VoiceVerify(ctx, &pb.VoiceVerifyRequest{
+			Audio1: voiceFile1, Audio2: voiceFile1, Threshold: voiceVerifyCeiling,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(same.GetVerified()).To(BeTrue(), "same clip should verify: dist=%.3f", same.GetDistance())
+		Expect(same.GetDistance()).To(BeNumerically("<", 0.05),
+			"identical-clip distance should be near zero, got %.3f", same.GetDistance())
+		GinkgoWriter.Printf("voice_verify(same): dist=%.3f confidence=%.1f\n", same.GetDistance(), same.GetConfidence())
+
+		// Cross-pair distance — assert relative ordering: d(file1,file3) > d(same).
+		// We don't require the fixtures to contain true same-speaker pairs —
+		// good same-speaker audio is hard to source un-gated. The RPC
+		// correctness is pinned by the same-clip check above; the pair
+		// distances here are about asserting the embedding actually encodes
+		// speaker info (ordering changes with speaker identity).
+		var d12, d13 float32
+		if voiceFile3 != "" {
+			res, err := client.VoiceVerify(ctx, &pb.VoiceVerifyRequest{
+				Audio1: voiceFile1, Audio2: voiceFile3, Threshold: voiceVerifyCeiling,
+			})
+			if err != nil {
+				GinkgoWriter.Printf("voice_verify(1vs3): skipped — %v\n", err)
+			} else {
+				d13 = res.GetDistance()
+				Expect(d13).To(BeNumerically(">", same.GetDistance()),
+					"cross-clip distance %.3f should exceed same-clip distance %.3f", d13, same.GetDistance())
+				GinkgoWriter.Printf("voice_verify(1vs3): dist=%.3f verified=%v\n", d13, res.GetVerified())
+			}
+		}
+
+		if voiceFile2 != "" {
+			res, err := client.VoiceVerify(ctx, &pb.VoiceVerifyRequest{
+				Audio1: voiceFile1, Audio2: voiceFile2, Threshold: voiceVerifyCeiling,
+			})
+			if err != nil {
+				GinkgoWriter.Printf("voice_verify(1vs2): skipped — %v\n", err)
+			} else {
+				d12 = res.GetDistance()
+				Expect(d12).To(BeNumerically(">", same.GetDistance()),
+					"cross-clip distance %.3f should exceed same-clip distance %.3f", d12, same.GetDistance())
+				GinkgoWriter.Printf("voice_verify(1vs2): dist=%.3f verified=%v\n", d12, res.GetVerified())
+			}
+		}
+
+		// If both pair distances were computed, record their ordering.
+		// We log rather than assert: ordering depends on the specific
+		// fixtures used, and CI defaults point at three different speakers.
+		if d12 > 0 && d13 > 0 {
+			GinkgoWriter.Printf("voice_verify ordering: d(1,2)=%.3f d(1,3)=%.3f\n", d12, d13)
+		}
+	})
+
+	It("analyzes voice via VoiceAnalyze", func() {
+		if !caps[capVoiceAnalyze] {
+			Skip("voice_analyze capability not enabled")
+		}
+		Expect(voiceFile1).NotTo(BeEmpty(), "BACKEND_TEST_VOICE_AUDIO_1_FILE or _URL must be set")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		res, err := client.VoiceAnalyze(ctx, &pb.VoiceAnalyzeRequest{Audio: voiceFile1})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.GetSegments()).NotTo(BeEmpty(), "VoiceAnalyze returned no segments")
+		for _, s := range res.GetSegments() {
+			Expect(s.GetAge()).To(BeNumerically(">", 0), "age should be populated by analyze-capable engines")
+			// Audeering's age-gender head outputs female / male / child;
+			// LocalAI capitalises those to Female / Male / Child. Custom
+			// checkpoints wired via the age_gender_model option may use
+			// different labels, so accept anything non-empty.
+			Expect(s.GetDominantGender()).NotTo(BeEmpty())
+		}
+		GinkgoWriter.Printf("voice_analyze: %d segments\n", len(res.GetSegments()))
 	})
 })
 

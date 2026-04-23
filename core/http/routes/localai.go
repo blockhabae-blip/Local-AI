@@ -120,6 +120,28 @@ func RegisterLocalAIRoutes(router *echo.Echo,
 	// Forget does not load a face model — it only needs the registry.
 	router.POST("/v1/face/forget", localai.FaceForgetEndpoint(app.FaceRegistry()))
 
+	// Voice (speaker) recognition endpoints
+	voiceMw := []echo.MiddlewareFunc{
+		requestExtractor.BuildFilteredFirstAvailableDefaultModel(config.BuildUsecaseFilterFn(config.FLAG_SPEAKER_RECOGNITION)),
+	}
+	router.POST("/v1/voice/verify",
+		localai.VoiceVerifyEndpoint(cl, ml, appConfig),
+		append(voiceMw, requestExtractor.SetModelAndConfig(func() schema.LocalAIRequest { return new(schema.VoiceVerifyRequest) }))...)
+	router.POST("/v1/voice/analyze",
+		localai.VoiceAnalyzeEndpoint(cl, ml, appConfig),
+		append(voiceMw, requestExtractor.SetModelAndConfig(func() schema.LocalAIRequest { return new(schema.VoiceAnalyzeRequest) }))...)
+	router.POST("/v1/voice/embed",
+		localai.VoiceEmbedEndpoint(cl, ml, appConfig),
+		append(voiceMw, requestExtractor.SetModelAndConfig(func() schema.LocalAIRequest { return new(schema.VoiceEmbedRequest) }))...)
+	router.POST("/v1/voice/register",
+		localai.VoiceRegisterEndpoint(cl, ml, appConfig, app.VoiceRegistry()),
+		append(voiceMw, requestExtractor.SetModelAndConfig(func() schema.LocalAIRequest { return new(schema.VoiceRegisterRequest) }))...)
+	router.POST("/v1/voice/identify",
+		localai.VoiceIdentifyEndpoint(cl, ml, appConfig, app.VoiceRegistry()),
+		append(voiceMw, requestExtractor.SetModelAndConfig(func() schema.LocalAIRequest { return new(schema.VoiceIdentifyRequest) }))...)
+	// Forget does not load a voice model — it only needs the registry.
+	router.POST("/v1/voice/forget", localai.VoiceForgetEndpoint(app.VoiceRegistry()))
+
 	ttsHandler := localai.TTSEndpoint(cl, ml, appConfig)
 	router.POST("/tts",
 		ttsHandler,

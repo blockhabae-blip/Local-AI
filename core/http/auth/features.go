@@ -65,6 +65,14 @@ var RouteFeatureRegistry = []RouteFeature{
 	{"POST", "/v1/face/identify", FeatureFaceRecognition},
 	{"POST", "/v1/face/forget", FeatureFaceRecognition},
 
+	// Voice (speaker) recognition
+	{"POST", "/v1/voice/verify", FeatureVoiceRecognition},
+	{"POST", "/v1/voice/analyze", FeatureVoiceRecognition},
+	{"POST", "/v1/voice/embed", FeatureVoiceRecognition},
+	{"POST", "/v1/voice/register", FeatureVoiceRecognition},
+	{"POST", "/v1/voice/identify", FeatureVoiceRecognition},
+	{"POST", "/v1/voice/forget", FeatureVoiceRecognition},
+
 	// Video
 	{"POST", "/video", FeatureVideo},
 
@@ -160,5 +168,6 @@ func APIFeatureMetas() []FeatureMeta {
 		{FeatureMCP, "MCP", true},
 		{FeatureStores, "Stores", true},
 		{FeatureFaceRecognition, "Face Recognition", true},
+		{FeatureVoiceRecognition, "Voice Recognition", true},
 	}
 }

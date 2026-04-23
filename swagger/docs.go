@@ -1166,6 +1166,25 @@ const docTemplate = `{
                 }
             }
         },
+        "/backends/known": {
+            "get": {
+                "tags": [
+                    "backends"
+                ],
+                "summary": "List all known Backends (importer registry + curated pref-only + installed-on-disk)",
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/schema.KnownBackend"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/backends/upgrade/{name}": {
             "post": {
                 "tags": [
@@ -2256,6 +2275,165 @@ const docTemplate = `{
                         "description": "Response",
                         "schema": {
                             "$ref": "#/definitions/schema.TokenizeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/voice/analyze": {
+            "post": {
+                "tags": [
+                    "voice-recognition"
+                ],
+                "summary": "Analyze demographic attributes (age, gender, emotion) from a voice clip.",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceAnalyzeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceAnalyzeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/voice/embed": {
+            "post": {
+                "tags": [
+                    "voice-recognition"
+                ],
+                "summary": "Extract a speaker embedding from an audio clip.",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceEmbedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceEmbedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/voice/forget": {
+            "post": {
+                "tags": [
+                    "voice-recognition"
+                ],
+                "summary": "Remove a previously-registered speaker by ID.",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceForgetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/v1/voice/identify": {
+            "post": {
+                "tags": [
+                    "voice-recognition"
+                ],
+                "summary": "Identify a speaker against the registered database (1:N recognition).",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceIdentifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceIdentifyResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/voice/register": {
+            "post": {
+                "tags": [
+                    "voice-recognition"
+                ],
+                "summary": "Register a speaker for 1:N identification.",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceRegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceRegisterResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/voice/verify": {
+            "post": {
+                "tags": [
+                    "voice-recognition"
+                ],
+                "summary": "Verify that two audio clips were spoken by the same person.",
+                "parameters": [
+                    {
+                        "description": "query params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceVerifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response",
+                        "schema": {
+                            "$ref": "#/definitions/schema.VoiceVerifyResponse"
                         }
                     }
                 }
@@ -3850,6 +4028,27 @@ const docTemplate = `{
                 }
             }
         },
+        "schema.KnownBackend": {
+            "type": "object",
+            "properties": {
+                "auto_detect": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "installed": {
+                    "description": "Installed is true when the backend is currently present on disk — i.e. it\nappears in gallery.ListSystemBackends(systemState). Importer-registered or\ncurated pref-only backends default to false unless they also show up on\ndisk. The import form uses this to warn users that submitting an import\nmay trigger an automatic backend download.",
+                    "type": "boolean"
+                },
+                "modality": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "schema.LogprobContent": {
             "type": "object",
             "properties": {
@@ -5095,6 +5294,248 @@ const docTemplate = `{
                 "width": {
                     "description": "output width in pixels",
                     "type": "integer"
+                }
+            }
+        },
+        "schema.VoiceAnalysis": {
+            "type": "object",
+            "properties": {
+                "age": {
+                    "type": "number"
+                },
+                "dominant_emotion": {
+                    "type": "string"
+                },
+                "dominant_gender": {
+                    "type": "string"
+                },
+                "emotion": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float32"
+                    }
+                },
+                "end": {
+                    "type": "number"
+                },
+                "gender": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float32"
+                    }
+                },
+                "start": {
+                    "type": "number"
+                }
+            }
+        },
+        "schema.VoiceAnalyzeRequest": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "description": "subset of {\"age\",\"gender\",\"emotion\"}",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "audio": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceAnalyzeResponse": {
+            "type": "object",
+            "properties": {
+                "segments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/schema.VoiceAnalysis"
+                    }
+                }
+            }
+        },
+        "schema.VoiceEmbedRequest": {
+            "type": "object",
+            "properties": {
+                "audio": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceEmbedResponse": {
+            "type": "object",
+            "properties": {
+                "dim": {
+                    "type": "integer"
+                },
+                "embedding": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "model": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceForgetRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "store": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceIdentifyMatch": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "distance": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "match": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceIdentifyRequest": {
+            "type": "object",
+            "properties": {
+                "audio": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "store": {
+                    "type": "string"
+                },
+                "threshold": {
+                    "type": "number"
+                },
+                "top_k": {
+                    "type": "integer"
+                }
+            }
+        },
+        "schema.VoiceIdentifyResponse": {
+            "type": "object",
+            "properties": {
+                "matches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/schema.VoiceIdentifyMatch"
+                    }
+                }
+            }
+        },
+        "schema.VoiceRegisterRequest": {
+            "type": "object",
+            "properties": {
+                "audio": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "model": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "store": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceRegisterResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "registered_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "schema.VoiceVerifyRequest": {
+            "type": "object",
+            "properties": {
+                "anti_spoofing": {
+                    "type": "boolean"
+                },
+                "audio1": {
+                    "type": "string"
+                },
+                "audio2": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "threshold": {
+                    "type": "number"
+                }
+            }
+        },
+        "schema.VoiceVerifyResponse": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "distance": {
+                    "type": "number"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "processing_time_ms": {
+                    "type": "number"
+                },
+                "threshold": {
+                    "type": "number"
+                },
+                "verified": {
+                    "type": "boolean"
                 }
             }
         },
