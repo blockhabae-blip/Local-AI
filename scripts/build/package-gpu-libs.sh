@@ -177,6 +177,7 @@ package_rocm_libs() {
     local rocm_libs=(
         "libamdhip64.so*"
         "libhipblas.so*"
+        "libhipblaslt.so*"
         "librocblas.so*"
         "librocrand.so*"
         "librocsparse.so*"
