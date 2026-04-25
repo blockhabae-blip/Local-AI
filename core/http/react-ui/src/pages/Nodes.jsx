@@ -269,6 +269,7 @@ export default function Nodes() {
   const [nodeBackends, setNodeBackends] = useState({})
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [confirmUnload, setConfirmUnload] = useState(null)
+  const [confirmDeleteBackend, setConfirmDeleteBackend] = useState(null)
   const [showTips, setShowTips] = useState(false)
   const [activeTab, setActiveTab] = useState('backend') // 'backend', 'agent', or 'scheduling'
   const [schedulingConfigs, setSchedulingConfigs] = useState([])
@@ -341,13 +342,23 @@ export default function Nodes() {
     }
   }
 
-  const handleReinstallBackend = async (nodeId, backendName) => {
+  const handleUpgradeBackend = async (nodeId, backendName) => {
     try {
       await nodesApi.installBackend(nodeId, backendName)
-      addToast(`Backend "${backendName}" reinstalled`, 'success')
+      addToast(`Backend "${backendName}" upgraded`, 'success')
       fetchBackends(nodeId)
     } catch (err) {
-      addToast(`Failed to reinstall backend: ${err.message}`, 'error')
+      addToast(`Failed to upgrade backend: ${err.message}`, 'error')
+    }
+  }
+
+  const handleDeleteBackendOnNode = async (nodeId, backendName) => {
+    try {
+      await nodesApi.deleteBackend(nodeId, backendName)
+      addToast(`Backend "${backendName}" deleted`, 'success')
+      fetchBackends(nodeId)
+    } catch (err) {
+      addToast(`Failed to delete backend: ${err.message}`, 'error')
     }
   }
 
@@ -897,13 +908,22 @@ export default function Nodes() {
                                       </td>
                                       <td style={{ textAlign: 'right' }}>
                                         {!b.is_system && (
-                                          <button
-                                            className="btn btn-secondary btn-sm"
-                                            onClick={() => handleReinstallBackend(node.id, b.name)}
-                                            title="Reinstall backend"
-                                          >
-                                            <i className="fas fa-sync-alt" />
-                                          </button>
+                                          <div style={{ display: 'inline-flex', gap: 'var(--spacing-xs)' }}>
+                                            <button
+                                              className="btn btn-secondary btn-sm"
+                                              onClick={() => handleUpgradeBackend(node.id, b.name)}
+                                              title="Upgrade backend on this node"
+                                            >
+                                              <i className="fas fa-arrow-up" />
+                                            </button>
+                                            <button
+                                              className="btn btn-danger-ghost btn-sm"
+                                              onClick={() => setConfirmDeleteBackend({ nodeId: node.id, nodeName: node.name, backend: b.name })}
+                                              title="Delete backend from this node"
+                                            >
+                                              <i className="fas fa-trash" />
+                                            </button>
+                                          </div>
                                         )}
                                       </td>
                                     </tr>
@@ -1075,6 +1095,21 @@ export default function Nodes() {
         danger
         onConfirm={() => confirmDelete && handleDelete(confirmDelete.id)}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteBackend}
+        title="Delete Backend"
+        message={confirmDeleteBackend ? `Delete "${confirmDeleteBackend.backend}" from ${confirmDeleteBackend.nodeName}? This removes the backend files from this node only.` : ''}
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (confirmDeleteBackend) {
+            handleDeleteBackendOnNode(confirmDeleteBackend.nodeId, confirmDeleteBackend.backend)
+          }
+          setConfirmDeleteBackend(null)
+        }}
+        onCancel={() => setConfirmDeleteBackend(null)}
       />
 
       <ConfirmDialog

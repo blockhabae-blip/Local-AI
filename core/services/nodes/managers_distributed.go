@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mudler/LocalAI/core/config"
 	"github.com/mudler/LocalAI/core/gallery"
@@ -81,6 +82,25 @@ type NodeOpStatus struct {
 // BackendOpResult aggregates per-node outcomes.
 type BackendOpResult struct {
 	Nodes []NodeOpStatus `json:"nodes"`
+}
+
+// Err returns a non-nil error aggregating per-node hard failures
+// (Status == "error"). Queued nodes (waiting for reconciler retry) are not
+// failures — surfacing them as errors would mislead users about durable
+// intent. Used by Install/Upgrade/Delete so reply.Success=false from
+// workers reaches OpStatus.Error and the UI, instead of being silently
+// dropped on the way up.
+func (r BackendOpResult) Err() error {
+	var failures []string
+	for _, n := range r.Nodes {
+		if n.Status == "error" {
+			failures = append(failures, fmt.Sprintf("%s: %s", n.NodeName, n.Error))
+		}
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(failures, "; "))
 }
 
 // enqueueAndDrainBackendOp is the shared scaffolding for
@@ -198,11 +218,20 @@ func (d *DistributedBackendManager) DeleteBackend(name string) error {
 	}
 
 	ctx := context.Background()
-	_, err := d.enqueueAndDrainBackendOp(ctx, OpBackendDelete, name, nil, func(node BackendNode) error {
-		_, err := d.adapter.DeleteBackend(node.ID, name)
-		return err
+	result, err := d.enqueueAndDrainBackendOp(ctx, OpBackendDelete, name, nil, func(node BackendNode) error {
+		reply, err := d.adapter.DeleteBackend(node.ID, name)
+		if err != nil {
+			return err
+		}
+		if !reply.Success {
+			return fmt.Errorf("delete failed: %s", reply.Error)
+		}
+		return nil
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return result.Err()
 }
 
 // DeleteBackendDetailed is the per-node-result variant called by the HTTP
@@ -213,8 +242,14 @@ func (d *DistributedBackendManager) DeleteBackendDetailed(ctx context.Context, n
 		return BackendOpResult{}, err
 	}
 	return d.enqueueAndDrainBackendOp(ctx, OpBackendDelete, name, nil, func(node BackendNode) error {
-		_, err := d.adapter.DeleteBackend(node.ID, name)
-		return err
+		reply, err := d.adapter.DeleteBackend(node.ID, name)
+		if err != nil {
+			return err
+		}
+		if !reply.Success {
+			return fmt.Errorf("delete failed: %s", reply.Error)
+		}
+		return nil
 	})
 }
 
@@ -292,7 +327,7 @@ func (d *DistributedBackendManager) InstallBackend(ctx context.Context, op *gall
 	galleriesJSON, _ := json.Marshal(op.Galleries)
 	backendName := op.GalleryElementName
 
-	_, err := d.enqueueAndDrainBackendOp(ctx, OpBackendInstall, backendName, galleriesJSON, func(node BackendNode) error {
+	result, err := d.enqueueAndDrainBackendOp(ctx, OpBackendInstall, backendName, galleriesJSON, func(node BackendNode) error {
 		reply, err := d.adapter.InstallBackend(node.ID, backendName, "", string(galleriesJSON), op.ExternalURI, op.ExternalName, op.ExternalAlias)
 		if err != nil {
 			return err
@@ -302,7 +337,10 @@ func (d *DistributedBackendManager) InstallBackend(ctx context.Context, op *gall
 		}
 		return nil
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return result.Err()
 }
 
 // UpgradeBackend reuses the install NATS subject (the worker re-downloads
@@ -310,7 +348,7 @@ func (d *DistributedBackendManager) InstallBackend(ctx context.Context, op *gall
 func (d *DistributedBackendManager) UpgradeBackend(ctx context.Context, name string, progressCb galleryop.ProgressCallback) error {
 	galleriesJSON, _ := json.Marshal(d.backendGalleries)
 
-	_, err := d.enqueueAndDrainBackendOp(ctx, OpBackendUpgrade, name, galleriesJSON, func(node BackendNode) error {
+	result, err := d.enqueueAndDrainBackendOp(ctx, OpBackendUpgrade, name, galleriesJSON, func(node BackendNode) error {
 		reply, err := d.adapter.InstallBackend(node.ID, name, "", string(galleriesJSON), "", "", "")
 		if err != nil {
 			return err
@@ -320,7 +358,10 @@ func (d *DistributedBackendManager) UpgradeBackend(ctx context.Context, name str
 		}
 		return nil
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return result.Err()
 }
 
 // CheckUpgrades checks for available backend upgrades across the cluster.
