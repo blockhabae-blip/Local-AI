@@ -925,6 +925,32 @@ jobs:
             cuda-minor-version: "0"
             platforms: 'linux/amd64'
             tag-latest: 'auto'
+            tag-suffix: '-gpu-nvidia-cuda-13-vllm'
+            runs-on: 'arc-runner-set'
+            base-image: "ubuntu:24.04"
+            skip-drivers: 'false'
+            backend: "vllm"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./"
+            ubuntu-version: '2404'
+          - build-type: 'cublas'
+            cuda-major-version: "13"
+            cuda-minor-version: "0"
+            platforms: 'linux/amd64'
+            tag-latest: 'auto'
+            tag-suffix: '-gpu-nvidia-cuda-13-vllm-omni'
+            runs-on: 'arc-runner-set'
+            base-image: "ubuntu:24.04"
+            skip-drivers: 'false'
+            backend: "vllm-omni"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./"
+            ubuntu-version: '2404'
+          - build-type: 'cublas'
+            cuda-major-version: "13"
+            cuda-minor-version: "0"
+            platforms: 'linux/amd64'
+            tag-latest: 'auto'
             tag-suffix: '-gpu-nvidia-cuda-13-transformers'
             runs-on: 'ubuntu-latest'
             base-image: "ubuntu:24.04"
@@ -1074,6 +1100,45 @@ jobs:
             skip-drivers: 'false'
             ubuntu-version: '2404'
             backend: "diffusers"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./"
+          - build-type: 'l4t'
+            cuda-major-version: "13"
+            cuda-minor-version: "0"
+            platforms: 'linux/arm64'
+            tag-latest: 'auto'
+            tag-suffix: '-nvidia-l4t-cuda-13-arm64-vllm'
+            runs-on: 'ubuntu-24.04-arm'
+            base-image: "ubuntu:24.04"
+            skip-drivers: 'false'
+            ubuntu-version: '2404'
+            backend: "vllm"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./"
+          - build-type: 'l4t'
+            cuda-major-version: "13"
+            cuda-minor-version: "0"
+            platforms: 'linux/arm64'
+            tag-latest: 'auto'
+            tag-suffix: '-nvidia-l4t-cuda-13-arm64-vllm-omni'
+            runs-on: 'ubuntu-24.04-arm'
+            base-image: "ubuntu:24.04"
+            skip-drivers: 'false'
+            ubuntu-version: '2404'
+            backend: "vllm-omni"
+            dockerfile: "./backend/Dockerfile.python"
+            context: "./"
+          - build-type: 'l4t'
+            cuda-major-version: "13"
+            cuda-minor-version: "0"
+            platforms: 'linux/arm64'
+            tag-latest: 'auto'
+            tag-suffix: '-nvidia-l4t-cuda-13-arm64-sglang'
+            runs-on: 'ubuntu-24.04-arm'
+            base-image: "ubuntu:24.04"
+            skip-drivers: 'false'
+            ubuntu-version: '2404'
+            backend: "sglang"
             dockerfile: "./backend/Dockerfile.python"
             context: "./"
           - build-type: 'l4t'
