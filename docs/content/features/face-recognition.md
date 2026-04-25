@@ -102,13 +102,13 @@ stand up.
     # → 204 No Content
     ```
 
-{{% alert icon="⚠️" color="warning" %}}
+{{% notice warning %}}
 **Storage caveat.** The default vector store is in-memory. All
 registered faces are lost when LocalAI restarts. Persistent storage
 (pgvector) is a tracked future enhancement — the face-recognition HTTP
 API is designed to swap the backing store without changing the wire
 format.
-{{% /alert %}}
+{{% /notice %}}
 
 ## API reference
 
@@ -256,13 +256,13 @@ only listed the face recognition weights), the request returns a gRPC
 `is_real=false`. Re-install the gallery entry or point the backend at a
 model that bundles the MiniFASNet ONNX files.
 
-{{% alert icon="ℹ" color="info" %}}
+{{% notice info %}}
 The MiniFASNet score is best at catching **printed photos and screen
 replays**. Deepfake videos and high-quality prosthetics are out of
 scope — liveness here is a low-cost first line of defence, not a
 guarantee. For higher assurance, combine with challenge-response (e.g.
 ask the user to turn their head).
-{{% /alert %}}
+{{% /notice %}}
 
 ## Choosing an engine
 

@@ -99,13 +99,13 @@ hood.
     # → 204 No Content
     ```
 
-{{% alert icon="⚠️" color="warning" %}}
+{{% notice warning %}}
 **Storage caveat.** The default vector store is in-memory. All
 registered speakers are lost when LocalAI restarts. Persistent storage
 (pgvector) is a tracked future enhancement shared with face
 recognition — the voice-recognition HTTP API is designed to swap the
 backing store without changing the wire format.
-{{% /alert %}}
+{{% /notice %}}
 
 ## API reference
 
