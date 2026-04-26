@@ -1807,6 +1807,7 @@ select.input {
   flex-wrap: wrap;
   padding-left: var(--spacing-md);
   border-left: 1px solid var(--color-border-subtle);
+  margin-left: auto;
 }
 .filter-bar-group__toggle {
   display: flex;

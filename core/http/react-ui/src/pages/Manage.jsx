@@ -7,10 +7,32 @@ import NodeDistributionChip from '../components/NodeDistributionChip'
 import FilterBar from '../components/FilterBar'
 import { useModels } from '../hooks/useModels'
 import { backendControlApi, modelsApi, backendsApi, systemApi, nodesApi } from '../utils/api'
+import {
+  CAP_CHAT, CAP_COMPLETION, CAP_IMAGE, CAP_VIDEO, CAP_TTS,
+  CAP_TRANSCRIPT, CAP_SOUND_GENERATION, CAP_FACE_RECOGNITION,
+  CAP_SPEAKER_RECOGNITION, CAP_EMBEDDINGS, CAP_RERANK,
+} from '../utils/capabilities'
 
 const TABS = [
   { key: 'models', label: 'Models', icon: 'fa-brain' },
   { key: 'backends', label: 'Backends', icon: 'fa-server' },
+]
+
+// Capability → use-case badge. Entries with `route` become clickable links to
+// the matching playground page; the rest render as informational badges.
+// Order is the display order. CAP_CHAT covers CAP_COMPLETION too.
+const USE_CASES = [
+  { cap: CAP_CHAT,                label: 'Chat',       route: (id) => `/app/chat/${encodeURIComponent(id)}` },
+  { cap: CAP_COMPLETION,          label: 'Completion', route: (id) => `/app/chat/${encodeURIComponent(id)}`, hideIf: CAP_CHAT },
+  { cap: CAP_IMAGE,               label: 'Image',      route: (id) => `/app/image/${encodeURIComponent(id)}` },
+  { cap: CAP_VIDEO,               label: 'Video',      route: (id) => `/app/video/${encodeURIComponent(id)}` },
+  { cap: CAP_TTS,                 label: 'TTS',        route: (id) => `/app/tts/${encodeURIComponent(id)}` },
+  { cap: CAP_TRANSCRIPT,          label: 'Transcribe', route: () => '/app/talk' },
+  { cap: CAP_SOUND_GENERATION,    label: 'Sound',      route: (id) => `/app/sound/${encodeURIComponent(id)}` },
+  { cap: CAP_FACE_RECOGNITION,    label: 'Face',       route: (id) => `/app/face/${encodeURIComponent(id)}` },
+  { cap: CAP_SPEAKER_RECOGNITION, label: 'Voice',      route: (id) => `/app/voice/${encodeURIComponent(id)}` },
+  { cap: CAP_EMBEDDINGS,          label: 'Embeddings' },
+  { cap: CAP_RERANK,              label: 'Rerank' },
 ]
 
 // formatInstalledAt renders an installed_at timestamp as a short relative/abs
@@ -503,7 +525,24 @@ export default function Manage() {
                     {/* Use Cases */}
                     <td>
                       <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
-                        <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/app/chat/${encodeURIComponent(model.id)}`) }} className="badge badge-info" style={{ textDecoration: 'none', cursor: 'pointer' }}>Chat</a>
+                        {(() => {
+                          const caps = Array.isArray(model.capabilities) ? model.capabilities : []
+                          const matched = USE_CASES.filter(uc => caps.includes(uc.cap) && !(uc.hideIf && caps.includes(uc.hideIf)))
+                          if (matched.length === 0) {
+                            return <span className="cell-muted">—</span>
+                          }
+                          return matched.map(uc => uc.route ? (
+                            <a
+                              key={uc.cap}
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); navigate(uc.route(model.id)) }}
+                              className="badge badge-info"
+                              style={{ textDecoration: 'none', cursor: 'pointer' }}
+                            >{uc.label}</a>
+                          ) : (
+                            <span key={uc.cap} className="badge">{uc.label}</span>
+                          ))
+                        })()}
                       </div>
                     </td>
                     {/* Actions */}
