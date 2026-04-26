@@ -101,6 +101,7 @@ export default function AgentChat() {
   const messagesEndRef = useRef(null)
   const messagesRef = useRef(null)
   const textareaRef = useRef(null)
+  const stickToBottomRef = useRef(true)
   const eventSourceRef = useRef(null)
   const messageIdCounter = useRef(0)
   const addMessageRef = useRef(addMessage)
@@ -260,10 +261,30 @@ export default function AgentChat() {
     }
   }, [name, userId, addToast, nextId])
 
-  // Auto-scroll to bottom
+  // Track whether the user is pinned to the bottom. If they scroll up
+  // while a response is streaming, stop forcing them back down.
   useEffect(() => {
+    const el = messagesRef.current
+    if (!el) return
+    const onScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      stickToBottomRef.current = distanceFromBottom < 80
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Auto-scroll only when the user hasn't scrolled away from the bottom.
+  useEffect(() => {
+    if (!stickToBottomRef.current) return
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamContent, streamReasoning, streamToolCalls])
+
+  // When switching conversations, snap to bottom and re-pin.
+  useEffect(() => {
+    stickToBottomRef.current = true
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+  }, [activeId])
 
   // Highlight code blocks
   useEffect(() => {

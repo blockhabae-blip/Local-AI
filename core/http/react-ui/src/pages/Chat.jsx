@@ -327,6 +327,7 @@ export default function Chat() {
   const fileInputRef = useRef(null)
   const messagesRef = useRef(null)
   const textareaRef = useRef(null)
+  const stickToBottomRef = useRef(true)
 
   const artifacts = useMemo(
     () => canvasMode ? extractCodeArtifacts(activeChat?.history, 'role', 'assistant') : [],
@@ -561,10 +562,30 @@ export default function Chat() {
     }
   }, [])
 
-  // Auto-scroll
+  // Track whether the user is pinned to the bottom. If they scroll up
+  // while a response is streaming, stop forcing them back down.
   useEffect(() => {
+    const el = messagesRef.current
+    if (!el) return
+    const onScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      stickToBottomRef.current = distanceFromBottom < 80
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Auto-scroll only when the user hasn't scrolled away from the bottom.
+  useEffect(() => {
+    if (!stickToBottomRef.current) return
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeChat?.history, streamingContent, streamingReasoning, streamingToolCalls])
+
+  // When switching chats, snap to bottom and re-pin.
+  useEffect(() => {
+    stickToBottomRef.current = true
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+  }, [activeChat?.id])
 
   // Highlight code blocks
   useEffect(() => {
