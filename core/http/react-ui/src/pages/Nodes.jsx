@@ -5,6 +5,7 @@ import { useModels } from '../hooks/useModels'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ImageSelector, { useImageSelector, dockerImage, dockerFlags } from '../components/ImageSelector'
+import StatCard from '../components/StatCard'
 
 function timeAgo(dateString) {
   if (!dateString) return 'never'
@@ -49,27 +50,6 @@ const modelStateConfig = {
   loading: { bg: 'var(--color-primary-light)', color: 'var(--color-primary)', border: 'var(--color-primary-border)' },
   unloading: { bg: 'var(--color-warning-light)', color: 'var(--color-warning)', border: 'var(--color-warning-border)' },
   idle: { bg: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)', border: 'var(--color-border-subtle)' },
-}
-
-function StatCard({ icon, label, value, color, accentVar }) {
-  // accentVar: optional CSS variable for the left edge + icon chip, e.g.
-  // "--color-success". When unset the card reads neutral — used for simple
-  // counts so they don't compete with the semantic cards for attention.
-  const accent = color || (accentVar ? `var(${accentVar})` : 'var(--color-text-primary)')
-  return (
-    <div
-      className="stat-card"
-      style={accentVar ? { ['--stat-accent']: `var(${accentVar})` } : undefined}
-    >
-      <div className="stat-card__body">
-        <div className="stat-card__label">{label}</div>
-        <div className="stat-card__value" style={{ color: accent }}>{value}</div>
-      </div>
-      <div className="stat-card__icon" style={accentVar ? { color: accent } : undefined}>
-        <i className={icon} />
-      </div>
-    </div>
-  )
 }
 
 function StepNumber({ n, bg, color }) {
