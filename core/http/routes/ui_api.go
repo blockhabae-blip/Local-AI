@@ -40,6 +40,25 @@ const (
 )
 
 // getDirectorySize calculates the total size of files in a directory
+// metaParentOf returns the name of the auto-resolving (meta) backend that
+// declares `name` as one of its hardware-specific variants in its
+// CapabilitiesMap, or "" if there is no such parent. The install picker uses
+// this to render hints like "CPU build of llama-cpp" without re-walking the
+// whole gallery on the client side.
+func metaParentOf(name string, backends gallery.GalleryElements[*gallery.GalleryBackend]) string {
+	for _, b := range backends {
+		if !b.IsMeta() {
+			continue
+		}
+		for _, concreteName := range b.CapabilitiesMap {
+			if concreteName == name {
+				return b.Name
+			}
+		}
+	}
+	return ""
+}
+
 func getDirectorySize(path string) (int64, error) {
 	var totalSize int64
 	entries, err := os.ReadDir(path)
@@ -998,23 +1017,37 @@ func RegisterUIAPIRoutes(app *echo.Echo, cl *config.ModelConfigLoader, ml *model
 				}
 			}
 
+			// Per-node distribution + parent meta lookup for the install picker.
+			// `nodes` populates the Nodes column on the gallery; `metaBackendFor`
+			// lets the picker name the parent (e.g. "CPU build of llama-cpp")
+			// without re-walking the whole gallery on the client.
+			var perNode []gallery.NodeBackendRef
+			if installedBackends != nil {
+				if sb, ok := installedBackends.Get(b.Name); ok {
+					perNode = sb.Nodes
+				}
+			}
+
 			backendsJSON = append(backendsJSON, map[string]any{
-				"id":            backendID,
-				"name":          b.Name,
-				"description":   b.Description,
-				"icon":          b.Icon,
-				"license":       b.License,
-				"urls":          b.URLs,
-				"tags":          b.Tags,
-				"gallery":       b.Gallery.Name,
-				"installed":     b.Installed,
-				"version":       b.Version,
-				"processing":    currentlyProcessing,
-				"jobID":         jobID,
-				"isDeletion":    isDeletionOp,
-				"isMeta":        b.IsMeta(),
-				"isAlias":       aliasedByMeta[b.Name],
-				"isDevelopment": b.IsDevelopment(devSuffix),
+				"id":             backendID,
+				"name":           b.Name,
+				"description":    b.Description,
+				"icon":           b.Icon,
+				"license":        b.License,
+				"urls":           b.URLs,
+				"tags":           b.Tags,
+				"gallery":        b.Gallery.Name,
+				"installed":      b.Installed,
+				"version":        b.Version,
+				"processing":     currentlyProcessing,
+				"jobID":          jobID,
+				"isDeletion":     isDeletionOp,
+				"isMeta":         b.IsMeta(),
+				"isAlias":        aliasedByMeta[b.Name],
+				"isDevelopment":  b.IsDevelopment(devSuffix),
+				"capabilities":   b.CapabilitiesMap,
+				"metaBackendFor": metaParentOf(b.Name, backends),
+				"nodes":          perNode,
 			})
 		}
 

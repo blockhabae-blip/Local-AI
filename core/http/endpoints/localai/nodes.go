@@ -363,6 +363,9 @@ func ResumeNodeEndpoint(registry *nodes.NodeRegistry) echo.HandlerFunc {
 }
 
 // InstallBackendOnNodeEndpoint triggers backend installation on a worker node via NATS.
+// Backend can be either a gallery ID (resolved against BackendGalleries) or a
+// direct URI install (URI + Name + optional Alias) — same shape as the
+// standalone /api/backends/install-external path, just scoped to one node.
 func InstallBackendOnNodeEndpoint(unloader nodes.NodeCommandSender) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if unloader == nil {
@@ -372,17 +375,24 @@ func InstallBackendOnNodeEndpoint(unloader nodes.NodeCommandSender) echo.Handler
 		var req struct {
 			Backend          string `json:"backend"`
 			BackendGalleries string `json:"backend_galleries,omitempty"`
+			URI              string `json:"uri,omitempty"`
+			Name             string `json:"name,omitempty"`
+			Alias            string `json:"alias,omitempty"`
 		}
-		if err := c.Bind(&req); err != nil || req.Backend == "" {
-			return c.JSON(http.StatusBadRequest, nodeError(http.StatusBadRequest, "backend name required"))
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, nodeError(http.StatusBadRequest, "invalid request body"))
 		}
-		reply, err := unloader.InstallBackend(nodeID, req.Backend, "", req.BackendGalleries, "", "", "")
+		// Either a gallery backend name or a direct URI must be supplied.
+		if req.Backend == "" && req.URI == "" {
+			return c.JSON(http.StatusBadRequest, nodeError(http.StatusBadRequest, "backend name or uri required"))
+		}
+		reply, err := unloader.InstallBackend(nodeID, req.Backend, "", req.BackendGalleries, req.URI, req.Name, req.Alias)
 		if err != nil {
-			xlog.Error("Failed to install backend on node", "node", nodeID, "backend", req.Backend, "error", err)
+			xlog.Error("Failed to install backend on node", "node", nodeID, "backend", req.Backend, "uri", req.URI, "error", err)
 			return c.JSON(http.StatusInternalServerError, nodeError(http.StatusInternalServerError, "failed to install backend on node"))
 		}
 		if !reply.Success {
-			xlog.Error("Backend install failed on node", "node", nodeID, "backend", req.Backend, "error", reply.Error)
+			xlog.Error("Backend install failed on node", "node", nodeID, "backend", req.Backend, "uri", req.URI, "error", reply.Error)
 			return c.JSON(http.StatusInternalServerError, nodeError(http.StatusInternalServerError, "backend installation failed"))
 		}
 		return c.JSON(http.StatusOK, map[string]string{"message": "backend installed"})

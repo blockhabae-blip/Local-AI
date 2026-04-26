@@ -108,3 +108,5 @@ func (b *LocalBackendManager) InstallBackend(ctx context.Context, op *Management
 	return gallery.InstallBackendFromGallery(ctx, b.backendGalleries, b.systemState,
 		b.modelLoader, op.GalleryElementName, progressCb, true)
 }
+
+func (b *LocalBackendManager) IsDistributed() bool { return false }

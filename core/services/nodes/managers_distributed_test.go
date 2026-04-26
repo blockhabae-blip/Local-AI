@@ -108,6 +108,7 @@ func (stubLocalBackendManager) UpgradeBackend(_ context.Context, _ string, _ gal
 func (stubLocalBackendManager) CheckUpgrades(_ context.Context) (map[string]gallery.UpgradeInfo, error) {
 	return nil, nil
 }
+func (stubLocalBackendManager) IsDistributed() bool { return false }
 
 var _ = Describe("DistributedBackendManager", func() {
 	var (

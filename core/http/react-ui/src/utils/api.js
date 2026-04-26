@@ -463,7 +463,17 @@ export const nodesApi = {
   approve: (id) => postJSON(API_CONFIG.endpoints.nodeApprove(id), {}),
   getModels: (id) => fetchJSON(API_CONFIG.endpoints.nodeModels(id)),
   getBackends: (id) => fetchJSON(API_CONFIG.endpoints.nodeBackends(id)),
-  installBackend: (id, backend) => postJSON(API_CONFIG.endpoints.nodeBackendsInstall(id), { backend }),
+  // installBackend installs a gallery backend on a single node. opts can
+  // override the gallery path and supply a direct URI (OCI image / URL / file
+  // path) plus an optional name+alias, mirroring the standalone /backends/
+  // install-external surface but scoped to one node.
+  installBackend: (id, backend, opts = {}) => postJSON(API_CONFIG.endpoints.nodeBackendsInstall(id), {
+    backend,
+    ...(opts.uri ? { uri: opts.uri } : {}),
+    ...(opts.name ? { name: opts.name } : {}),
+    ...(opts.alias ? { alias: opts.alias } : {}),
+    ...(opts.backend_galleries ? { backend_galleries: opts.backend_galleries } : {}),
+  }),
   deleteBackend: (id, backend) => postJSON(API_CONFIG.endpoints.nodeBackendsDelete(id), { backend }),
   getBackendLogs: (id) => fetchJSON(API_CONFIG.endpoints.nodeBackendLogs(id)),
   getBackendLogLines: (id, modelId) => fetchJSON(API_CONFIG.endpoints.nodeBackendLogsModel(id, modelId)),

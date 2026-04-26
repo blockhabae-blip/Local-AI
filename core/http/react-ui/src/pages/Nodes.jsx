@@ -845,10 +845,30 @@ export default function Nodes() {
                               </table>
                             )}
 
-                            <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-sm)', color: 'var(--color-text-secondary)' }}>
-                              <i className="fas fa-cogs" style={{ marginRight: 6 }} />
-                              Installed Backends
-                            </h4>
+                            <div style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-sm)',
+                            }}>
+                              <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, margin: 0, color: 'var(--color-text-secondary)' }}>
+                                <i className="fas fa-cogs" style={{ marginRight: 6 }} />
+                                Installed Backends
+                              </h4>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Hand off to the gallery in target-node mode.
+                                  // The Backends page reads ?target=<id> and
+                                  // scopes its install action to this node —
+                                  // one gallery, two scopes, no duplicate UI.
+                                  navigate(`/app/backends?target=${encodeURIComponent(node.id)}`)
+                                }}
+                                title={`Install a backend on ${node.name}`}
+                              >
+                                <i className="fas fa-plus" /> Add backend
+                              </button>
+                            </div>
                             {!backends ? (
                               <LoadingSpinner size="sm" />
                             ) : backends.length === 0 ? (

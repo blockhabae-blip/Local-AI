@@ -364,6 +364,11 @@ func (d *DistributedBackendManager) UpgradeBackend(ctx context.Context, name str
 	return result.Err()
 }
 
+// IsDistributed reports that installs from this manager fan out across the
+// cluster. The HTTP layer reads this to gate hardware-specific installs on
+// /api/backends/apply (which would otherwise silently land on every node).
+func (d *DistributedBackendManager) IsDistributed() bool { return true }
+
 // CheckUpgrades checks for available backend upgrades across the cluster.
 //
 // The previous implementation delegated to d.local, which called
