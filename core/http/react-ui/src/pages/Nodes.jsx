@@ -1198,12 +1198,38 @@ export default function Nodes() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {models.map(m => {
-                                    const stCfg = modelStateConfig[m.state] || modelStateConfig.idle
-                                    return (
-                                      <tr key={m.id || m.model_name}>
+                                  {(() => {
+                                    // Pre-compute per-model replica counts so the disambiguation
+                                    // pill only renders when this node actually hosts >1 replica
+                                    // of the same model. Single-replica deployments stay clean.
+                                    const replicaCounts = {}
+                                    models.forEach(m => { replicaCounts[m.model_name] = (replicaCounts[m.model_name] || 0) + 1 })
+                                    return models.map(m => {
+                                      const stCfg = modelStateConfig[m.state] || modelStateConfig.idle
+                                      const showReplica = (replicaCounts[m.model_name] || 0) > 1
+                                      // Per-replica process key — what the worker stores logs under and what the
+                                      // store's GetLines/Subscribe match on for replica-scoped filtering.
+                                      const processKey = `${m.model_name}#${m.replica_index ?? 0}`
+                                      return (
+                                      <tr key={m.id || `${m.model_name}#${m.replica_index ?? 0}`}>
                                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
                                           {m.model_name}
+                                          {showReplica && (
+                                            <span
+                                              className="cell-mono"
+                                              aria-label={`replica ${m.replica_index ?? 0}`}
+                                              title={`Replica ${m.replica_index ?? 0} on this node`}
+                                              style={{
+                                                marginLeft: 8, padding: '1px 6px', borderRadius: 'var(--radius-sm)',
+                                                background: 'var(--color-bg-tertiary)',
+                                                border: '1px solid var(--color-border-subtle)',
+                                                fontSize: '0.6875rem', fontWeight: 500,
+                                                color: 'var(--color-text-secondary)',
+                                              }}
+                                            >
+                                              rep {m.replica_index ?? 0}
+                                            </span>
+                                          )}
                                         </td>
                                         <td>
                                           <span style={{
@@ -1222,10 +1248,14 @@ export default function Nodes() {
                                             href="#"
                                             onClick={(e) => {
                                               e.preventDefault()
-                                              navigate(`/app/node-backend-logs/${node.id}/${encodeURIComponent(m.model_name)}`)
+                                              // Send the replica-scoped process key (modelName#replicaIndex).
+                                              // The worker's BackendLogStore returns only this replica's lines
+                                              // when given the full key; a future "merged" toggle in the logs
+                                              // page can navigate to the bare modelName URL to use aggregation.
+                                              navigate(`/app/node-backend-logs/${node.id}/${encodeURIComponent(processKey)}`)
                                             }}
                                             style={{ fontSize: '0.75rem', color: 'var(--color-primary)' }}
-                                            title="View backend logs"
+                                            title={showReplica ? `View backend logs for replica ${m.replica_index ?? 0}` : 'View backend logs'}
                                           >
                                             <i className="fas fa-terminal" />
                                           </a>
@@ -1249,7 +1279,8 @@ export default function Nodes() {
                                         </td>
                                       </tr>
                                     )
-                                  })}
+                                  })
+                                  })()}
                                 </tbody>
                               </table>
                             )}
