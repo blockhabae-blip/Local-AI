@@ -720,13 +720,14 @@ export default function Manage() {
             </div>
           </div>
         ) : (() => {
-          // Meta backends are the surface operators actually configure
-          // against (e.g. "llama-cpp"), so they're always shown. The two
-          // toggles govern the noise around them: concrete platform-specific
-          // variants (e.g. "llama-cpp-cuda12-12.4") that a meta backend
-          // aliases, and pre-release `-development` builds.
+          // Production meta backends (e.g. "llama-cpp") are the surface
+          // operators actually configure against — gallery enrichment marks
+          // them isAlias=false/isDevelopment=false, so they pass both toggles.
+          // Meta-dev entries (e.g. "llama-cpp-development") still carry
+          // isDevelopment=true in the gallery and must be hidden by the
+          // Development toggle just like concrete dev variants — don't
+          // short-circuit on IsMeta or they leak through.
           const flagsFor = (b) => {
-            if (b.IsMeta) return { variant: false, dev: false }
             const g = enrichBackend(b.Name)
             if (!g) return { variant: false, dev: false }
             return { variant: !!g.isAlias, dev: !!g.isDevelopment }
