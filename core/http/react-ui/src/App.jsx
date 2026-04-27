@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import OperationsBar from './components/OperationsBar'
 import { ToastContainer, useToast } from './components/Toast'
 import { systemApi } from './utils/api'
+import { useTheme } from './contexts/ThemeContext'
+import { useAuth } from './context/AuthContext'
 
 const COLLAPSED_KEY = 'localai_sidebar_collapsed'
 
@@ -15,6 +17,10 @@ export default function App() {
   const { toasts, addToast, removeToast } = useToast()
   const [version, setVersion] = useState('')
   const location = useLocation()
+  const navigate = useNavigate()
+  const { theme, toggleTheme } = useTheme()
+  const { authEnabled, user } = useAuth()
+  const hamburgerRef = useRef(null)
   const isChatRoute = location.pathname.match(/\/chat(\/|$)/) || location.pathname.match(/\/agents\/[^/]+\/chat/)
 
   useEffect(() => {
@@ -34,26 +40,80 @@ export default function App() {
     window.scrollTo(0, 0)
   }, [location.pathname])
 
+  // Drawer polish: lock body scroll, close on Escape, return focus to the
+  // hamburger when the drawer closes. Only engages when the drawer is open;
+  // desktop and tablet rail mode are unaffected.
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e) => { if (e.key === 'Escape') setSidebarOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+      // Restore focus to the trigger so keyboard users land back where
+      // they invoked the drawer from.
+      hamburgerRef.current?.focus()
+    }
+  }, [sidebarOpen])
+
   const layoutClasses = [
     'app-layout',
     isChatRoute ? 'app-layout-chat' : '',
     sidebarCollapsed ? 'sidebar-is-collapsed' : '',
   ].filter(Boolean).join(' ')
 
+  const showAvatar = authEnabled && user
+  const accountLabel = user?.name || user?.email || 'Account'
+
   return (
     <div className={layoutClasses}>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <main className="main-content">
+      <main className="main-content" {...(sidebarOpen ? { 'aria-hidden': 'true', inert: '' } : {})}>
         <OperationsBar />
-        {/* Mobile header */}
+        {/* Mobile header — primary actions reachable without opening the
+            drawer. Hamburger is the only way to expand the nav on phones;
+            theme toggle and account avatar are mirrored from the sidebar
+            footer so they remain one tap away. */}
         <header className="mobile-header">
           <button
+            ref={hamburgerRef}
             className="hamburger-btn"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={sidebarOpen}
+            aria-controls="app-sidebar"
           >
-            <i className="fas fa-bars" />
+            <i className="fas fa-bars" aria-hidden="true" />
           </button>
           <span className="mobile-title">LocalAI</span>
+          <div className="mobile-header-actions">
+            <button
+              type="button"
+              className="mobile-header-btn"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`} aria-hidden="true" />
+            </button>
+            {showAvatar && (
+              <button
+                type="button"
+                className="mobile-header-btn mobile-header-avatar"
+                onClick={() => navigate('/app/account')}
+                aria-label={`Account: ${accountLabel}`}
+                title={accountLabel}
+              >
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" />
+                ) : (
+                  <i className="fas fa-user-circle" aria-hidden="true" />
+                )}
+              </button>
+            )}
+          </div>
         </header>
         <div className="main-content-inner">
           <div className="page-transition" key={location.pathname}>

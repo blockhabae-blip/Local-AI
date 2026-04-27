@@ -417,7 +417,7 @@ export default function Nodes() {
 
   if (loading) {
     return (
-      <div className="page" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xl)' }}>
+      <div className="page page--wide" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xl)' }}>
         <LoadingSpinner size="lg" />
       </div>
     )
@@ -426,7 +426,7 @@ export default function Nodes() {
   // Disabled state
   if (!enabled) {
     return (
-      <div className="page">
+      <div className="page page--wide">
         <div style={{ textAlign: 'center', padding: 'var(--spacing-xl) 0' }}>
           <i className="fas fa-network-wired" style={{ fontSize: '3rem', color: 'var(--color-primary)', marginBottom: 'var(--spacing-md)' }} />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: 'var(--spacing-sm)' }}>
@@ -529,7 +529,7 @@ export default function Nodes() {
   const pending = filteredNodes.filter(n => n.status === 'pending').length
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header">
         <h1 className="page-title">
           <i className="fas fa-network-wired" style={{ marginRight: 'var(--spacing-sm)' }} />

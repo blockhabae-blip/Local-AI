@@ -204,7 +204,7 @@ export default function Skills() {
 
   if (unavailable) {
     return (
-      <div className="page">
+      <div className="page page--wide">
         <div className="page-header">
           <h1 className="page-title">Skills</h1>
           <p className="page-subtitle">Skills service is not available or the index is rebuilding. Try again in a moment.</p>
@@ -219,7 +219,7 @@ export default function Skills() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <style>{`
         .skills-header-actions {
           display: flex;

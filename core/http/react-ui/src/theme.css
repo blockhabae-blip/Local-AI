@@ -142,6 +142,19 @@
   --sidebar-width-collapsed: 52px;
   --color-toggle-off: #2f3644;
   --color-toggle-on: var(--color-primary);
+
+  /* Page-width archetypes — applied via .page / .page--narrow /
+     .page--medium / .page--wide. Default is wide-enough for ops/data
+     tables; medium suits two-column app pages (sticky nav + form);
+     narrow caps reading width. */
+  --page-max-narrow: 760px;
+  --page-max-medium: 1080px;
+  --page-max-default: 1600px;
+  --page-max-wide: none;
+
+  /* Responsive breakpoints — kept here so JS can read them via getComputedStyle. */
+  --bp-mobile: 640px;
+  --bp-tablet: 1024px;
 }
 
 [data-theme="light"] {
@@ -232,4 +245,13 @@
 
   --color-toggle-off: #c3cad6;
   --color-toggle-on: var(--color-primary);
+
+  /* Page-width archetypes — see :root block for usage. */
+  --page-max-narrow: 760px;
+  --page-max-medium: 1080px;
+  --page-max-default: 1600px;
+  --page-max-wide: none;
+
+  --bp-mobile: 640px;
+  --bp-tablet: 1024px;
 }

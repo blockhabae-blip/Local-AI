@@ -794,7 +794,7 @@ export default function Users() {
   const isSelf = (u) => currentUser && (u.id === currentUser.id || u.email === currentUser.email)
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header">
         <h1 className="page-title">Users</h1>
         <p className="page-subtitle">Manage registered users, roles, and invites</p>

@@ -380,7 +380,7 @@ export default function Traces() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header">
         <h1 className="page-title">Traces</h1>
         <p className="page-subtitle">View logged API requests, responses, and backend operations</p>

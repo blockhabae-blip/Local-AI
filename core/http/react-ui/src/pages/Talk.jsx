@@ -443,7 +443,7 @@ export default function Talk() {
 
   // ── Render ──
   return (
-    <div className="page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div className="page page--narrow" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ width: '100%', maxWidth: '48rem' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-lg)' }}>
           <h1 className="page-title">Talk</h1>

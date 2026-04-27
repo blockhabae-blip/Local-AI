@@ -133,6 +133,55 @@
 .mobile-title {
   font-weight: 600;
   color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.mobile-header-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  border-radius: var(--radius-full);
+  transition: background var(--duration-fast) var(--ease-default);
+}
+.mobile-header-btn:hover {
+  background: var(--color-bg-hover);
+}
+.mobile-header-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.mobile-header-avatar {
+  padding: 4px;
+}
+.mobile-header-avatar img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.mobile-header-avatar .fa-user-circle {
+  font-size: 1.5rem;
 }
 
 /* Sidebar */
@@ -827,14 +876,21 @@
   color: var(--color-text-muted);
 }
 
-/* Common page styles */
+/* Common page styles — width archetype is opt-in via modifiers.
+   Default cap fits 9-column data tables on ultrawide displays without
+   feeling untethered. Add .page--narrow for forms / single-record edit
+   views, .page--wide for full-bleed (chat shells, log streams). */
 .page {
   padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-2xl);
-  max-width: 1200px;
-  margin: 0 auto;
   width: 100%;
+  max-width: var(--page-max, var(--page-max-default));
+  margin: 0 auto;
   animation: fadeIn var(--duration-normal) var(--ease-default);
 }
+
+.page--narrow { --page-max: var(--page-max-narrow); }
+.page--medium { --page-max: var(--page-max-medium); }
+.page--wide   { --page-max: var(--page-max-wide); }
 
 .page-header {
   margin-bottom: var(--spacing-xl);
@@ -3855,7 +3911,7 @@ select.input {
   grid-template-columns: minmax(320px, 420px) 1fr;
   gap: var(--spacing-lg);
   padding: var(--spacing-xl);
-  max-width: 1280px;
+  max-width: var(--page-max-default);
   margin: 0 auto;
   width: 100%;
   align-items: start;
@@ -4070,66 +4126,112 @@ select.input {
   color: var(--color-danger);
 }
 
-/* Responsive */
+/* ============================================================
+   Responsive
+   ------------------------------------------------------------
+   Three viewport tiers, expressed as cascading media queries:
+
+   * desktop  (≥1024px) — full sidebar, content margin-left = sidebar-width
+   * tablet   (640–1023) — 52px icon rail; tap hamburger to overlay-expand
+   * mobile   (<640px)  — sidebar slides off-screen behind a top-bar drawer
+
+   Touch-target minimums apply across both tablet and mobile via the
+   first (max-width: 1023px) block.
+   ============================================================ */
+
+/* Touch-friendly sizing + shared layout simplifications (tablet + mobile) */
 @media (max-width: 1023px) {
-  .main-content,
-  .sidebar-is-collapsed .main-content {
-    margin-left: 0;
+  .hamburger-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .mobile-header {
-    display: flex;
-  }
-
-  .sidebar {
-    transform: translateX(-100%);
-    width: var(--sidebar-width);
-  }
-
-  .sidebar.collapsed {
-    width: var(--sidebar-width);
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
+  .nav-item {
+    min-height: 44px;
   }
 
   .sidebar-close-btn {
-    display: block;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
   }
 
-  .sidebar-collapse-btn {
-    display: none;
+  .mobile-header {
+    min-height: 56px;
   }
 
-  .sidebar.collapsed .nav-label,
-  .sidebar.collapsed .nav-external,
-  .sidebar.collapsed .sidebar-section-title {
-    display: unset;
+  /* Layouts that need to collapse to single-column on any narrow viewport */
+  .chat-sidebar { display: none; }
+  .chat-settings-drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+  .media-layout { grid-template-columns: 1fr; }
+  .media-controls { position: static; }
+  .page { padding: var(--spacing-md); }
+
+  /* The desktop collapse chevron is desktop-only — tablets auto-rail,
+     mobile uses the hamburger. */
+  .sidebar-collapse-btn { display: none; }
+}
+
+/* Tablet (640–1023): persistent icon rail; tap hamburger to overlay-expand */
+@media (max-width: 1023px) and (min-width: 640px) {
+  .main-content,
+  .sidebar-is-collapsed .main-content {
+    margin-left: var(--sidebar-width-collapsed);
   }
 
-  .sidebar.collapsed .sidebar-logo-link {
-    display: block;
+  .mobile-header { display: none; }
+
+  .sidebar {
+    width: var(--sidebar-width-collapsed);
+    transform: translateX(0);
+  }
+  .sidebar.collapsed { width: var(--sidebar-width-collapsed); }
+
+  /* Apply collapsed visuals while not pinned-open. These mirror the
+     existing .sidebar.collapsed desktop rules so we re-use one look. */
+  .sidebar:not(.open) .nav-label,
+  .sidebar:not(.open) .nav-external,
+  .sidebar:not(.open) .sidebar-section-title,
+  .sidebar:not(.open) .sidebar-section-chevron { display: none; }
+  .sidebar:not(.open) .sidebar-logo-link { display: none; }
+  .sidebar:not(.open) .sidebar-logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  .sidebar:not(.open) .sidebar-header { justify-content: center; }
+  .sidebar:not(.open) .nav-item {
+    justify-content: center;
+    padding: 8px 0;
+    border-left-width: 2px;
+  }
+  .sidebar:not(.open) .nav-icon { width: auto; font-size: 1rem; }
+  .sidebar:not(.open) .sidebar-footer {
+    justify-content: center;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  .sidebar:not(.open) .sidebar-user-name,
+  .sidebar:not(.open) .sidebar-logout-btn { display: none; }
+
+  /* Pinned open: overlay the full sidebar on top of content */
+  .sidebar.open {
+    width: var(--sidebar-width);
+    box-shadow: var(--shadow-md);
   }
 
-  .sidebar.collapsed .sidebar-logo-icon {
-    display: none;
-  }
-
-  .sidebar.collapsed .nav-item {
-    justify-content: flex-start;
-    padding: 6px var(--spacing-sm);
-    border-left-width: 3px;
-  }
-
-  .sidebar.collapsed .nav-icon {
-    width: 18px;
-    font-size: 0.85rem;
-  }
-
-  .sidebar.collapsed .sidebar-header {
-    justify-content: space-between;
-  }
+  .sidebar-close-btn { display: none; }
+  .sidebar.open .sidebar-close-btn { display: flex; }
 
   .sidebar-overlay {
     display: block;
@@ -4138,26 +4240,110 @@ select.input {
     background: rgba(0, 0, 0, 0.5);
     z-index: 40;
   }
+}
 
-  .chat-sidebar {
-    display: none;
+/* Mobile (<640): sidebar slides off-screen as a drawer */
+@media (max-width: 639px) {
+  .main-content,
+  .sidebar-is-collapsed .main-content {
+    margin-left: 0;
   }
 
-  .chat-settings-drawer {
-    width: 100%;
-    max-width: 100%;
+  .mobile-header { display: flex; }
+
+  .sidebar {
+    transform: translateX(-100%);
+    width: var(--sidebar-width);
+  }
+  .sidebar.collapsed { width: var(--sidebar-width); }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-close-btn { display: flex; }
+
+  /* When opened on mobile, even if the .collapsed class is present
+     from desktop preference, force the expanded look — drawer always
+     shows full labels. */
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .nav-external,
+  .sidebar.collapsed .sidebar-section-title { display: unset; }
+  .sidebar.collapsed .sidebar-logo-link { display: block; }
+  .sidebar.collapsed .sidebar-logo-icon { display: none; }
+  .sidebar.collapsed .nav-item {
+    justify-content: flex-start;
+    padding: 10px var(--spacing-md);
+    border-left-width: 3px;
+  }
+  .sidebar.collapsed .nav-icon {
+    width: 18px;
+    font-size: 0.85rem;
+  }
+  .sidebar.collapsed .sidebar-header { justify-content: space-between; }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+  }
+}
+
+/* Mobile reflow polish — phone-only (<640) layout adjustments for
+   page chrome that was designed flex-row on desktop. */
+@media (max-width: 639px) {
+  /* Page header: stack title block + inline-action cluster vertically */
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
   }
 
-  .media-layout {
-    grid-template-columns: 1fr;
+  /* Filter chip rows scroll horizontally instead of wrapping into walls */
+  .filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-btn { flex-shrink: 0; }
+
+  .search-bar { min-width: 0; }
+
+  /* Tables go edge-to-edge; offsetting against .page padding gives full
+     bleed without changing the table layout itself. */
+  .table-container {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    margin-inline: calc(-1 * var(--spacing-md));
   }
 
-  .media-controls {
-    position: static;
+  /* Operations toasts: scroll horizontally instead of wrapping */
+  .operations-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
   }
+  .operation-item { flex-shrink: 0; }
+  .operation-text {
+    max-width: 60vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 
-  .page {
-    padding: var(--spacing-md);
+/* Reduced motion — disable non-essential transitions for users who
+   request it. Keeps focus/state changes accessible without animation. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .page-transition,
+  .operations-bar,
+  .page,
+  .main-content {
+    transition: none !important;
+    animation: none !important;
   }
 }
 
@@ -4939,7 +5125,7 @@ select.input {
 
 .biometrics-page {
   padding: var(--spacing-xl);
-  max-width: 1320px;
+  max-width: var(--page-max-wide);
   margin: 0 auto;
   width: 100%;
   animation: fadeIn var(--duration-normal) var(--ease-default);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
 import { useAuth } from '../context/AuthContext'
@@ -107,10 +107,21 @@ export default function Sidebar({ isOpen, onClose }) {
   const { isAdmin, authEnabled, user, logout, hasFeature } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const closeBtnRef = useRef(null)
 
   useEffect(() => {
     fetch(apiUrl('/api/features')).then(r => r.json()).then(setFeatures).catch(() => {})
   }, [])
+
+  // Move focus into the drawer when opened on mobile/tablet so keyboard
+  // and screen-reader users land inside the dialog. Targeting the close
+  // button avoids hijacking the visual focus to a nav item the user may
+  // not have meant to activate.
+  useEffect(() => {
+    if (!isOpen) return
+    const id = window.requestAnimationFrame(() => closeBtnRef.current?.focus())
+    return () => window.cancelAnimationFrame(id)
+  }, [isOpen])
 
   // Auto-expand section containing the active route
   useEffect(() => {
@@ -168,7 +179,11 @@ export default function Sidebar({ isOpen, onClose }) {
     <>
       {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
 
-      <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+      <aside
+        id="app-sidebar"
+        className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}
+        aria-label="Primary navigation"
+      >
         {/* Logo */}
         <div className="sidebar-header">
           <a href="./" className="sidebar-logo-link">
@@ -177,8 +192,13 @@ export default function Sidebar({ isOpen, onClose }) {
           <a href="./" className="sidebar-logo-icon" title="LocalAI">
             <img src={apiUrl('/static/logo.png')} alt="LocalAI" className="sidebar-logo-icon-img" />
           </a>
-          <button className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
-            <i className="fas fa-times" />
+          <button
+            ref={closeBtnRef}
+            className="sidebar-close-btn"
+            onClick={onClose}
+            aria-label="Close menu"
+          >
+            <i className="fas fa-times" aria-hidden="true" />
           </button>
         </div>
 

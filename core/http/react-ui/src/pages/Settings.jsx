@@ -98,14 +98,14 @@ export default function Settings() {
     return () => container.removeEventListener('scroll', onScroll)
   }, [loading])
 
-  if (loading) return <div className="page" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xl)' }}><LoadingSpinner size="lg" /></div>
-  if (!settings) return <div className="page"><div className="empty-state"><p className="empty-state-text">Settings not available</p></div></div>
+  if (loading) return <div className="page page--medium" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xl)' }}><LoadingSpinner size="lg" /></div>
+  if (!settings) return <div className="page page--medium"><div className="empty-state"><p className="empty-state-text">Settings not available</p></div></div>
 
   const isDirty = settings && initialSettings && JSON.stringify(settings) !== JSON.stringify(initialSettings)
   const watchdogEnabled = settings.watchdog_idle_enabled || settings.watchdog_busy_enabled
 
   return (
-    <div className="page" style={{ maxWidth: 1000, padding: 0 }}>
+    <div className="page page--medium" style={{ padding: 0 }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

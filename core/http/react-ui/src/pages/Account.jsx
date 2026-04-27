@@ -403,7 +403,7 @@ export default function Account() {
 
   if (!authEnabled) {
     return (
-      <div className="page">
+      <div className="page page--narrow">
         <div className="empty-state">
           <div className="empty-state-icon"><i className="fas fa-user-gear" /></div>
           <h2 className="empty-state-title">Account unavailable</h2>
@@ -418,7 +418,7 @@ export default function Account() {
   const visibleTabs = isLocal ? TABS : TABS.filter(t => t.id !== 'security')
 
   return (
-    <div className="page account-page">
+    <div className="page page--narrow account-page">
       {/* Header */}
       <div className="page-header">
         <h1 className="page-title">Account</h1>

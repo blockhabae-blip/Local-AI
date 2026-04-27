@@ -1039,7 +1039,7 @@ export default function FineTune() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 className="page-title">Fine-Tuning <span className="badge badge-warning" style={{ fontSize: '0.45em', verticalAlign: 'middle' }}>Experimental</span></h1>

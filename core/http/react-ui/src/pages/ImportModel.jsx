@@ -804,7 +804,7 @@ export default function ImportModel() {
   )
 
   return (
-    <div className="page" style={{ maxWidth: '900px' }}>
+    <div className="page page--narrow">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--spacing-sm)' }}>
         <div>
           <h1 className="page-title">Import New Model</h1>

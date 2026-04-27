@@ -89,7 +89,7 @@ export default function Collections() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <style>{`
         .collections-create-bar {
           display: flex;

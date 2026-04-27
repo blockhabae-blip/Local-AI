@@ -679,7 +679,7 @@ export default function Usage() {
 
   if (!authEnabled) {
     return (
-      <div className="page">
+      <div className="page page--wide">
         <div className="empty-state">
           <div className="empty-state-icon"><i className="fas fa-chart-bar" /></div>
           <h2 className="empty-state-title">Usage tracking unavailable</h2>
@@ -705,7 +705,7 @@ export default function Usage() {
   const monoCell = { fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header" style={{ marginBottom: 'var(--spacing-sm)' }}>
         <h1 className="page-title">Usage</h1>
         <p className="page-subtitle">API token usage statistics</p>

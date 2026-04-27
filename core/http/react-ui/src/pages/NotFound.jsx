@@ -4,7 +4,7 @@ export default function NotFound() {
   const navigate = useNavigate()
 
   return (
-    <div className="page">
+    <div className="page page--narrow">
       <div className="empty-state">
         <div className="empty-state-icon"><i className="fas fa-compass" /></div>
         <h1 className="empty-state-title" style={{ fontSize: '3rem' }}>404</h1>

@@ -170,7 +170,7 @@ export default function P2P() {
 
   if (loading) {
     return (
-      <div className="page" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xl)' }}>
+      <div className="page page--narrow" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xl)' }}>
         <LoadingSpinner size="lg" />
       </div>
     )
@@ -179,7 +179,7 @@ export default function P2P() {
   // ── P2P Disabled ──
   if (!enabled) {
     return (
-      <div className="page">
+      <div className="page page--narrow">
         <div style={{ textAlign: 'center', padding: 'var(--spacing-xl) 0' }}>
           <i className="fas fa-network-wired" style={{ fontSize: '3rem', color: 'var(--color-primary)', marginBottom: 'var(--spacing-md)' }} />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: 'var(--spacing-sm)' }}>
@@ -292,7 +292,7 @@ export default function P2P() {
   const mlxTotal = stats.mlx_workers?.total ?? 0
 
   return (
-    <div className="page">
+    <div className="page page--narrow">
       <div className="page-header">
         <h1 className="page-title">
           <i className="fas fa-circle-nodes" style={{ marginRight: 'var(--spacing-sm)' }} />

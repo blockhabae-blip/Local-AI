@@ -136,7 +136,7 @@ export default function Agents() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <style>{`
         .agents-import-input { display: none; }
         .agents-toolbar {

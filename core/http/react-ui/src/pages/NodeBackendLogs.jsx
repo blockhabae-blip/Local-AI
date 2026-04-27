@@ -126,7 +126,7 @@ export default function NodeBackendLogs() {
 
   if (!nodeId || !modelId) {
     return (
-      <div className="page">
+      <div className="page page--wide">
         <div className="empty-state">
           <div className="empty-state-icon"><i className="fas fa-terminal" /></div>
           <h2 className="empty-state-title">No node/model selected</h2>
@@ -140,7 +140,7 @@ export default function NodeBackendLogs() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ marginBottom: 0 }}>

@@ -177,7 +177,7 @@ export default function Models() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 className="page-title">Install Models</h1>

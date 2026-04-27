@@ -315,7 +315,7 @@ export default function Backends() {
   )
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       {/* Target-node banner: when this gallery is scoped to one node via
           ?target=<id> (entered from /app/nodes), show the scope clearly and
           give a fast way to clear it. Visually a primary-tinted strip so the

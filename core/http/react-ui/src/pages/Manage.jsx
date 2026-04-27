@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import ResourceMonitor from '../components/ResourceMonitor'
 import ConfirmDialog from '../components/ConfirmDialog'
-import Toggle from '../components/Toggle'
 import NodeDistributionChip from '../components/NodeDistributionChip'
 import FilterBar from '../components/FilterBar'
 import GalleryLoader from '../components/GalleryLoader'
@@ -44,7 +43,7 @@ const USE_CASES = [
 
 // Number of columns the expandable detail row spans, per tab. Kept as
 // constants so adding/removing a column doesn't silently break the colSpan.
-const MODELS_COLSPAN = 8 // chevron, toggle, icon, name, status, backend, use cases, actions
+const MODELS_COLSPAN = 7 // chevron, icon, name, status, backend, use cases, actions
 
 // formatInstalledAt renders an installed_at timestamp as a short relative/abs
 // string suitable for dense tables. Returns the raw value if parsing fails so
@@ -427,7 +426,7 @@ export default function Manage() {
   const updatesCount = Object.keys(upgrades).length
 
   return (
-    <div className="page">
+    <div className="page page--wide">
       <div className="page-header">
         <h1 className="page-title">System</h1>
         <p className="page-subtitle">Manage installed models and backends</p>
@@ -547,9 +546,6 @@ export default function Manage() {
               <thead>
                 <tr>
                   <th style={{ width: 30 }}></th>
-                  <th style={{ width: 36 }}>
-                    <span className="visually-hidden">Enabled</span>
-                  </th>
                   <th style={{ width: 64 }}></th>
                   <th>Model</th>
                   <th>Status</th>
@@ -583,13 +579,6 @@ export default function Manage() {
                       )}
                     >
                       <ChevronCell expanded={isExpanded} />
-                      <StopPropagationCell>
-                        <Toggle
-                          checked={!model.disabled}
-                          onChange={() => handleToggleModel(model.id, model.disabled)}
-                          disabled={togglingModels.has(model.id)}
-                        />
-                      </StopPropagationCell>
                       <IconCell icon={enriched?.icon} fallback="fa-brain" alt="" />
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -655,6 +644,10 @@ export default function Manage() {
                           ariaLabel={`Actions for ${model.id}`}
                           triggerLabel={`Actions for ${model.id}`}
                           items={[
+                            { key: 'toggle', icon: model.disabled ? 'fa-toggle-on' : 'fa-toggle-off',
+                              label: model.disabled ? 'Enable model' : 'Disable model',
+                              onClick: () => handleToggleModel(model.id, model.disabled),
+                              disabled: togglingModels.has(model.id) },
                             { key: 'stop', icon: 'fa-stop', label: 'Stop model',
                               onClick: () => handleStopModel(model.id), hidden: !isRunning },
                             { key: 'pin', icon: 'fa-thumbtack',
