@@ -76,6 +76,30 @@ Eviction is rarely needed in normal operation — `DEPS_REFRESH` handles weekly 
 
 - The "Free Disk Space" / "Release space from worker" steps run on every job — these reclaim ~6 GB on `ubuntu-latest` runners. They are runner-state cleanup, not Docker, and BuildKit caches don't apply.
 - Intermediate artifacts of `Build and push (PR)` are not pushed anywhere — PRs only build for verification.
+- Darwin builds (see below) — macOS runners have no Docker daemon, so the registry-backed BuildKit cache cannot apply.
+
+## Darwin native caches
+
+`backend_build_darwin.yml` runs natively on `macOS-14` GitHub-hosted runners — there is no Docker, no BuildKit, no cross-job registry cache. Instead, the reusable workflow uses `actions/cache@v4` for four native caches that mirror the spirit of the Linux cache (warm by default, weekly refresh for unpinned Python deps, PRs read-only).
+
+| Cache | Path(s) | Key | Scope |
+|---|---|---|---|
+| Go modules + build | `~/go/pkg/mod`, `~/Library/Caches/go-build` | `go.sum` (managed by `actions/setup-go@v5` `cache: true`) | All darwin jobs |
+| Homebrew | `~/Library/Caches/Homebrew/downloads`, selected `/opt/homebrew/Cellar/*` | hash of `backend_build_darwin.yml` | All darwin jobs |
+| ccache (llama.cpp CMake) | `~/Library/Caches/ccache` | pinned `LLAMA_VERSION` from `backend/cpp/llama-cpp/Makefile` | `inputs.backend == 'llama-cpp'` only |
+| Python wheels (uv + pip) | `~/Library/Caches/pip`, `~/Library/Caches/uv` | `inputs.backend` + ISO week (`+%Y-W%V`) + hash of that backend's `requirements*.txt` | `inputs.lang == 'python'` only |
+
+Read/write semantics match the BuildKit cache: `actions/cache/restore` runs every time, `actions/cache/save` is gated on `github.event_name != 'pull_request'`. PRs read master's warm cache but never write back.
+
+The Python wheel cache uses the same ISO-week cache-buster as the Linux `DEPS_REFRESH` build-arg — same problem (unpinned `torch`/`mlx`/`diffusers`/`transformers` resolve to fresh wheels weekly), same ~one-cold-rebuild-per-week solution.
+
+The brew Cellar cache requires `HOMEBREW_NO_AUTO_UPDATE=1` and `HOMEBREW_NO_INSTALL_CLEANUP=1` (set as job-level env). Without those, `brew install` would mutate the very directories that were just restored, defeating the cache.
+
+For ccache, the workflow exports `CMAKE_ARGS=… -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache` via `$GITHUB_ENV` before running `make build-darwin-go-backend`. The Makefile in `backend/cpp/llama-cpp/` already forwards `CMAKE_ARGS` through to each variant build (`fallback`, `grpc`, `rpc-server`), so no script changes are needed. The three variants share most TUs, so ccache dedupes object files across them.
+
+### Cache budget on Darwin
+
+GitHub Actions caches are limited to 10 GB per repo. Steady-state worst case: ~800 MB Go cache + ~2 GB brew Cellar + up to 2 GB ccache + ~1.5 GB × 5 python backends. If the cap is hit, prefer collapsing the per-backend Python keys into a shared `pyenv-darwin-shared-<week>` key (accepts more cross-backend churn for a smaller footprint) before reducing other caches.
 
 ## Touching the cache pipeline
 
