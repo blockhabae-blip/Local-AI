@@ -134,7 +134,20 @@ export default function Manage() {
   const [modelsFilter, setModelsFilter] = useState(() => searchParams.get('mf') || 'all')
   const [backendsSearch, setBackendsSearch] = useState(() => searchParams.get('bq') || '')
   const [backendsFilter, setBackendsFilter] = useState(() => searchParams.get('bf') || 'all')
-  const [showMetaDev, setShowMetaDev] = useState(() => searchParams.get('bm') === '1')
+  // Two independent toggles. Meta backends are always visible — they're the
+  // entries operators configure against. `bv` controls platform-specific
+  // concrete variants (e.g. llama-cpp-cuda12-12.4) that a meta backend
+  // aliases on the host. `bd` controls pre-release `-development` builds.
+  // The legacy `bm` flag (when both were bundled) maps onto both so old
+  // deep-links land on the same view they used to.
+  const [showVariants, setShowVariants] = useState(() => {
+    const p = searchParams
+    return p.get('bv') === '1' || p.get('bm') === '1'
+  })
+  const [showDevelopment, setShowDevelopment] = useState(() => {
+    const p = searchParams
+    return p.get('bd') === '1' || p.get('bm') === '1'
+  })
 
   // Sync filter state into the URL so deep-links + tab switches survive.
   useEffect(() => {
@@ -144,10 +157,12 @@ export default function Manage() {
     setOrDelete('mf', modelsFilter)
     setOrDelete('bq', backendsSearch)
     setOrDelete('bf', backendsFilter)
-    if (showMetaDev) p.set('bm', '1'); else p.delete('bm')
+    if (showVariants) p.set('bv', '1'); else p.delete('bv')
+    if (showDevelopment) p.set('bd', '1'); else p.delete('bd')
+    p.delete('bm')
     setSearchParams(p, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelsSearch, modelsFilter, backendsSearch, backendsFilter, showMetaDev])
+  }, [modelsSearch, modelsFilter, backendsSearch, backendsFilter, showVariants, showDevelopment])
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
@@ -712,16 +727,24 @@ export default function Manage() {
             </div>
           </div>
         ) : (() => {
-          // A backend is "meta or development" if its installed metadata flags
-          // it OR if the gallery record does. We hide them by default so the
-          // installed list stops looking like the raw debug dump it was — the
-          // toggle exposes them on demand without reshuffling the row layout.
-          const isMetaOrDev = (b) => {
-            if (b.IsMeta) return true
+          // Meta backends are the surface operators actually configure
+          // against (e.g. "llama-cpp"), so they're always shown. The two
+          // toggles govern the noise around them: concrete platform-specific
+          // variants (e.g. "llama-cpp-cuda12-12.4") that a meta backend
+          // aliases, and pre-release `-development` builds.
+          const flagsFor = (b) => {
+            if (b.IsMeta) return { variant: false, dev: false }
             const g = enrichBackend(b.Name)
-            return !!(g?.isMeta || g?.isDevelopment)
+            if (!g) return { variant: false, dev: false }
+            return { variant: !!g.isAlias, dev: !!g.isDevelopment }
           }
-          const visibleBase = backends.filter(b => showMetaDev || !isMetaOrDev(b))
+          const isHidden = (b) => {
+            const f = flagsFor(b)
+            if (f.variant && !showVariants) return true
+            if (f.dev && !showDevelopment) return true
+            return false
+          }
+          const visibleBase = backends.filter(b => !isHidden(b))
 
           // Counts AFTER the meta/dev filter so the chip numbers reflect what
           // the user is actually about to filter into.
@@ -735,7 +758,12 @@ export default function Manage() {
               return s && s !== 'healthy' && s !== 'draining'
             })
           }).length
-          const hiddenMetaCount = backends.length - visibleBase.length
+          // Per-toggle counts: how many items in this category are currently
+          // hidden because of THIS toggle. A dev-variant counts in both —
+          // that's fine, it tells the operator the category is non-empty.
+          const hiddenVariantCount = showVariants ? 0 : backends.filter(b => flagsFor(b).variant).length
+          const hiddenDevCount     = showDevelopment ? 0 : backends.filter(b => flagsFor(b).dev).length
+          const hiddenTotal        = backends.length - visibleBase.length
 
           const BACKEND_FILTERS = [
             { key: 'all',        label: 'All',        icon: 'fa-layer-group',       count: visibleBase.length },
@@ -777,13 +805,22 @@ export default function Manage() {
               filters={BACKEND_FILTERS}
               activeFilter={backendsFilter}
               onFilterChange={setBackendsFilter}
-              toggles={[{
-                key: 'metadev',
-                label: hiddenMetaCount > 0 ? `Show meta & development (${hiddenMetaCount})` : 'Show meta & development',
-                icon: 'fa-flask',
-                checked: showMetaDev,
-                onChange: () => setShowMetaDev(v => !v),
-              }]}
+              toggles={[
+                {
+                  key: 'variants',
+                  label: hiddenVariantCount > 0 ? `Variants (${hiddenVariantCount})` : 'Variants',
+                  icon: 'fa-cubes',
+                  checked: showVariants,
+                  onChange: () => setShowVariants(v => !v),
+                },
+                {
+                  key: 'development',
+                  label: hiddenDevCount > 0 ? `Development (${hiddenDevCount})` : 'Development',
+                  icon: 'fa-flask',
+                  checked: showDevelopment,
+                  onChange: () => setShowDevelopment(v => !v),
+                },
+              ]}
             />
           )
 
@@ -795,8 +832,8 @@ export default function Manage() {
                   <i className="fas fa-filter" />
                   <p>
                     No backends match the current filter.
-                    {!showMetaDev && hiddenMetaCount > 0 && (
-                      <> {hiddenMetaCount} meta or development backend{hiddenMetaCount === 1 ? ' is' : 's are'} hidden — toggle "Show meta & development" to reveal {hiddenMetaCount === 1 ? 'it' : 'them'}.</>
+                    {hiddenTotal > 0 && (
+                      <> {hiddenTotal} backend{hiddenTotal === 1 ? ' is' : 's are'} hidden by the Variants/Development toggles — flip them on to reveal {hiddenTotal === 1 ? 'it' : 'them'}.</>
                     )}
                   </p>
                   <button className="btn btn-ghost btn-sm" onClick={() => { setBackendsSearch(''); setBackendsFilter('all') }}>Clear filters</button>
