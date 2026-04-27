@@ -85,6 +85,7 @@ clean: ## Remove build related file
 clean-tests:
 	rm -rf test-models
 	rm -rf test-dir
+	rm -f tests/e2e/mock-backend/mock-backend
 
 ## Install Go tools
 install-go-tools:
@@ -143,32 +144,24 @@ osx-signed: build
 run: ## run local-ai
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" $(GOCMD) run ./
 
-test-models/testmodel.ggml:
-	mkdir -p test-models
-	mkdir -p test-dir
-	wget -q https://huggingface.co/mradermacher/gpt2-alpaca-gpt4-GGUF/resolve/main/gpt2-alpaca-gpt4.Q4_K_M.gguf -O test-models/testmodel.ggml
-	wget -q https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin -O test-models/whisper-en
-	wget -q https://cdn.openai.com/whisper/draft-20220913a/micro-machines.wav -O test-dir/audio.wav
-	cp tests/models_fixtures/* test-models
-
-prepare-test: protogen-go
-	cp tests/models_fixtures/* test-models
+prepare-test: protogen-go build-mock-backend
 
 ########################################################
 ## Tests
 ########################################################
 
 ## Test targets
-test: test-models/testmodel.ggml protogen-go
+## After the test-suite reorg (see plans/test-reorg) the default `make test`
+## no longer downloads multi-GB GGUF/whisper fixtures or builds llama-cpp /
+## transformers / piper / whisper / stablediffusion-ggml. core/http/app_test.go
+## now drives the mock-backend binary built by build-mock-backend; real-backend
+## inference moved into tests/e2e-backends/ (per-backend, path-filtered) and
+## tests/e2e-aio/ (nightly).
+test: prepare-test
 	@echo 'Running tests'
 	export GO_TAGS="debug"
-	$(MAKE) prepare-test
 	OPUS_SHIM_LIBRARY=$(abspath ./pkg/opus/shim/libopusshim.so) \
-	HUGGINGFACE_GRPC=$(abspath ./)/backend/python/transformers/run.sh TEST_DIR=$(abspath ./)/test-dir/ FIXTURES=$(abspath ./)/tests/fixtures CONFIG_FILE=$(abspath ./)/test-models/config.yaml MODELS_PATH=$(abspath ./)/test-models BACKENDS_PATH=$(abspath ./)/backends \
-	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="!llama-gguf"  --flake-attempts $(TEST_FLAKES) --fail-fast -v -r $(TEST_PATHS)
-	$(MAKE) test-llama-gguf
-	$(MAKE) test-tts
-	$(MAKE) test-stablediffusion
+	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --flake-attempts $(TEST_FLAKES) --fail-fast -v -r $(TEST_PATHS)
 
 ########################################################
 ## E2E AIO tests (uses standard image with pre-configured models)
@@ -235,20 +228,12 @@ teardown-e2e:
 ## Integration and unit tests
 ########################################################
 
-test-llama-gguf: prepare-test
-	TEST_DIR=$(abspath ./)/test-dir/ FIXTURES=$(abspath ./)/tests/fixtures CONFIG_FILE=$(abspath ./)/test-models/config.yaml MODELS_PATH=$(abspath ./)/test-models BACKENDS_PATH=$(abspath ./)/backends \
-	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="llama-gguf" --flake-attempts $(TEST_FLAKES) -v -r $(TEST_PATHS)
-
-test-tts: prepare-test
-	TEST_DIR=$(abspath ./)/test-dir/ FIXTURES=$(abspath ./)/tests/fixtures CONFIG_FILE=$(abspath ./)/test-models/config.yaml MODELS_PATH=$(abspath ./)/test-models BACKENDS_PATH=$(abspath ./)/backends \
-	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="tts" --flake-attempts $(TEST_FLAKES) -v -r $(TEST_PATHS)
-
-test-stablediffusion: prepare-test
-	TEST_DIR=$(abspath ./)/test-dir/ FIXTURES=$(abspath ./)/tests/fixtures CONFIG_FILE=$(abspath ./)/test-models/config.yaml MODELS_PATH=$(abspath ./)/test-models BACKENDS_PATH=$(abspath ./)/backends \
-	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="stablediffusion" --flake-attempts $(TEST_FLAKES) -v -r $(TEST_PATHS)
-
-test-stores:
-	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="stores" --flake-attempts $(TEST_FLAKES) -v -r tests/integration
+## Storage / vector-store integration. Requires the local-store backend to
+## be available — we build it on demand and pass its location via
+## BACKENDS_PATH (the model loader looks there for the gRPC binary).
+test-stores: backends/local-store
+	BACKENDS_PATH=$(abspath ./)/backends \
+	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --flake-attempts $(TEST_FLAKES) -v -r tests/integration
 
 test-opus:
 	@echo 'Running opus backend tests'
@@ -269,23 +254,13 @@ test-realtime: build-mock-backend
 	@echo 'Running realtime e2e tests (mock backend)'
 	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="Realtime && !real-models" --flake-attempts $(TEST_FLAKES) -v -r ./tests/e2e
 
-# Real-model realtime tests. Set REALTIME_TEST_MODEL to use your own pipeline,
-# or leave unset to auto-build one from the component env vars below.
+# Container-based real-model realtime testing. Build env vars / pipeline
+# definition kept here so test-realtime-models-docker can drive a fully wired
+# pipeline (VAD + STT + LLM + TTS) from inside a containerised runner.
 REALTIME_VAD?=silero-vad-ggml
 REALTIME_STT?=whisper-1
 REALTIME_LLM?=qwen3-0.6b
 REALTIME_TTS?=tts-1
-REALTIME_BACKENDS_PATH?=$(abspath ./)/backends
-
-test-realtime-models: build-mock-backend
-	@echo 'Running realtime e2e tests (real models)'
-	REALTIME_TEST_MODEL=$${REALTIME_TEST_MODEL:-realtime-test-pipeline} \
-	REALTIME_VAD=$(REALTIME_VAD) \
-	REALTIME_STT=$(REALTIME_STT) \
-	REALTIME_LLM=$(REALTIME_LLM) \
-	REALTIME_TTS=$(REALTIME_TTS) \
-	REALTIME_BACKENDS_PATH=$(REALTIME_BACKENDS_PATH) \
-	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="Realtime" --flake-attempts $(TEST_FLAKES) -v -r ./tests/e2e
 
 # --- Container-based real-model testing ---
 
@@ -528,7 +503,9 @@ test-extra-backend: protogen-go
 
 ## Convenience wrappers: build the image, then exercise it.
 test-extra-backend-llama-cpp: docker-build-llama-cpp
-	BACKEND_IMAGE=local-ai-backend:llama-cpp $(MAKE) test-extra-backend
+	BACKEND_IMAGE=local-ai-backend:llama-cpp \
+	BACKEND_TEST_CAPS=health,load,predict,stream,logprobs,logit_bias \
+	$(MAKE) test-extra-backend
 
 test-extra-backend-ik-llama-cpp: docker-build-ik-llama-cpp
 	BACKEND_IMAGE=local-ai-backend:ik-llama-cpp $(MAKE) test-extra-backend

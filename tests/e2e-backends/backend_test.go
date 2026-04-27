@@ -102,6 +102,8 @@ const (
 	capVoiceEmbed    = "voice_embed"
 	capVoiceVerify   = "voice_verify"
 	capVoiceAnalyze  = "voice_analyze"
+	capLogprobs      = "logprobs"
+	capLogitBias     = "logit_bias"
 
 	defaultPrompt             = "The capital of France is"
 	streamPrompt              = "Once upon a time"
@@ -422,6 +424,7 @@ var _ = Describe("Backend container", Ordered, func() {
 
 		var chunks int
 		var combined string
+		var firstChunks []string
 		for {
 			msg, err := stream.Recv()
 			if err == io.EOF {
@@ -431,10 +434,69 @@ var _ = Describe("Backend container", Ordered, func() {
 			if len(msg.GetMessage()) > 0 {
 				chunks++
 				combined += string(msg.GetMessage())
+				if len(firstChunks) < 2 {
+					firstChunks = append(firstChunks, string(msg.GetMessage()))
+				}
 			}
 		}
 		Expect(chunks).To(BeNumerically(">", 0), "no stream chunks received")
+		// Regression guard: a bug in llama-cpp's grpc-server.cpp caused the
+		// role-init array element to get the same ChatDelta stamped, duplicating
+		// the first content token. Applies to any streaming backend.
+		if len(firstChunks) >= 2 {
+			Expect(firstChunks[0]).NotTo(Equal(firstChunks[1]),
+				"first content token was duplicated: %v", firstChunks)
+		}
 		GinkgoWriter.Printf("Stream: %d chunks, combined=%q\n", chunks, combined)
+	})
+
+	// Logprobs: backends that wire OpenAI-compatible logprobs return a
+	// JSON-encoded payload in Reply.logprobs (see backend.proto). The exact
+	// shape is backend-specific; we only assert that the field is populated
+	// when requested. Gated by capLogprobs because not every backend
+	// implements it.
+	It("returns logprobs when requested", func() {
+		if !caps[capLogprobs] {
+			Skip("logprobs capability not enabled")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		res, err := client.Predict(ctx, &pb.PredictOptions{
+			Prompt:      prompt,
+			Tokens:      10,
+			Temperature: 0.1,
+			TopK:        40,
+			TopP:        0.9,
+			Logprobs:    1,
+			TopLogprobs: 1,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.GetMessage()).NotTo(BeEmpty(), "Predict produced empty output")
+		Expect(res.GetLogprobs()).NotTo(BeEmpty(), "Reply.logprobs was empty when requested")
+		GinkgoWriter.Printf("Logprobs: %d bytes\n", len(res.GetLogprobs()))
+	})
+
+	// Logit bias: encoded as a JSON string keyed by token id. We don't
+	// know the model's tokenizer, so we exercise the API path with a
+	// nonsense bias map that any backend should accept and ignore for
+	// unknown ids. The assertion is that the request succeeds — proving
+	// the LogitBias plumbing is wired end-to-end.
+	It("accepts logit_bias when supplied", func() {
+		if !caps[capLogitBias] {
+			Skip("logit_bias capability not enabled")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		res, err := client.Predict(ctx, &pb.PredictOptions{
+			Prompt:      prompt,
+			Tokens:      10,
+			Temperature: 0.1,
+			TopK:        40,
+			TopP:        0.9,
+			LogitBias:   `{"1":-100}`,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.GetMessage()).NotTo(BeEmpty(), "Predict produced empty output with logit_bias")
 	})
 
 	It("computes embeddings via Embedding", func() {

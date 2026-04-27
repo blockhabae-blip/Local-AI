@@ -507,6 +507,33 @@ jobs:
       - name: Build llama-cpp backend image and run audio transcription gRPC e2e tests
         run: |
           make test-extra-backend-llama-cpp-transcription
+  # PR-acceptance smoke gate: always runs on every PR (no detect-changes gate, no
+  # paths filter). Pulls the pre-built master CPU llama-cpp image from quay
+  # instead of building from source, so the cost is a docker pull (~30s) plus the
+  # short Qwen3-0.6B model download. Exercises the full gRPC surface — health,
+  # load, predict, stream — plus the logprobs/logit_bias specs that moved out of
+  # core/http/app_test.go. Anything heavier or per-backend is gated to the
+  # detect-changes path-filter above.
+  tests-llama-cpp-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Pull pre-built llama-cpp backend image
+        run: docker pull quay.io/go-skynet/local-ai-backends:master-cpu-llama-cpp
+      - name: Run e2e-backends smoke
+        env:
+          BACKEND_IMAGE: quay.io/go-skynet/local-ai-backends:master-cpu-llama-cpp
+          BACKEND_TEST_CAPS: health,load,predict,stream,logprobs,logit_bias
+        run: |
+          make test-extra-backend
   # Realtime e2e with sherpa-onnx driving VAD + STT + TTS against a mocked LLM.
   # Builds the sherpa-onnx Docker image, extracts the rootfs so the e2e suite
   # can discover the backend binary + shared libs, downloads the three model
