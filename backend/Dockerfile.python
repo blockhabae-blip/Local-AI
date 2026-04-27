@@ -203,6 +203,13 @@ COPY scripts/build/package-gpu-libs.sh /package-gpu-libs.sh
 ARG FROM_SOURCE=""
 ENV FROM_SOURCE=${FROM_SOURCE}
 
+# Cache-buster for the per-backend `make` step. Most Python backends list
+# unpinned deps (torch, transformers, vllm, ...), so a warm registry cache
+# would otherwise freeze upstream versions indefinitely. CI passes a value
+# that rolls weekly so the install layer is rebuilt at most once per week
+# and picks up newer wheels from PyPI / nightly indexes.
+ARG DEPS_REFRESH=initial
+
 RUN cd /${BACKEND} && PORTABLE_PYTHON=true make
 
 # Package GPU libraries into the backend's lib directory

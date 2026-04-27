@@ -208,6 +208,15 @@ jobs:
           username: ${{ secrets.quayUsername }}
           password: ${{ secrets.quayPassword }}
 
+      # Weekly cache-buster for the per-backend `make` step. Most Python
+      # backends list unpinned deps (torch, transformers, vllm, ...), so a
+      # warm cache freezes upstream versions indefinitely. Rolling this
+      # weekly forces a re-resolve of the install layer at most once per
+      # week, picking up newer wheels without a full cold rebuild.
+      - name: Compute deps refresh key
+        id: deps_refresh
+        run: echo "key=$(date -u +%Y-W%V)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@v7
         if: github.event_name != 'pull_request'
@@ -222,6 +231,7 @@ jobs:
             BACKEND=${{ inputs.backend }}
             UBUNTU_VERSION=${{ inputs.ubuntu-version }}
             AMDGPU_TARGETS=${{ inputs.amdgpu-targets }}
+            DEPS_REFRESH=${{ steps.deps_refresh.outputs.key }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache${{ inputs.tag-suffix }}
@@ -245,6 +255,7 @@ jobs:
             BACKEND=${{ inputs.backend }}
             UBUNTU_VERSION=${{ inputs.ubuntu-version }}
             AMDGPU_TARGETS=${{ inputs.amdgpu-targets }}
+            DEPS_REFRESH=${{ steps.deps_refresh.outputs.key }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache${{ inputs.tag-suffix }}
