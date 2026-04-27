@@ -163,10 +163,16 @@ func RegisterNodeEndpoint(registry *nodes.NodeRegistry, expectedToken string, au
 			return c.JSON(http.StatusInternalServerError, nodeError(http.StatusInternalServerError, "failed to register node"))
 		}
 
-		// Store static labels from worker and apply auto-labels
-		if len(req.Labels) > 0 {
-			if err := registry.SetNodeLabels(ctx, node.ID, req.Labels); err != nil {
-				xlog.Warn("Failed to set node labels", "node", node.ID, "error", err)
+		// Merge worker-supplied labels into the node's existing label set,
+		// then apply auto-labels. Using SetNodeLabels here would have
+		// delete-then-recreate semantics — every worker re-register would
+		// wipe any UI-added label (since PR #9583 the worker always sends
+		// the auto-mirror `node.replica-slots`, which made the latent bug
+		// from PR #9186 trigger universally instead of only for workers
+		// with `--node-labels` set).
+		for k, v := range req.Labels {
+			if err := registry.SetNodeLabel(ctx, node.ID, k, v); err != nil {
+				xlog.Warn("Failed to set node label", "node", node.ID, "key", k, "error", err)
 			}
 		}
 		registry.ApplyAutoLabels(ctx, node.ID, node)
