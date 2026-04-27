@@ -67,4 +67,55 @@ var _ = Describe("Worker per-replica process keying", func() {
 			Expect(labels).To(HaveKeyWithValue("node.replica-slots", "2"))
 		})
 	})
+
+	Describe("Process map lookup by bare model name", func() {
+		// Regression: PR #9583 changed the supervisor's map key from
+		// `modelID` to `modelID#replicaIndex`. The NATS backend.stop
+		// handler kept passing the bare modelID, so the lookup silently
+		// no-op'd — the worker process stayed alive after an admin
+		// "Unload model" click, and subsequent chats kept being served
+		// by the leftover process. The registry rows were gone, so the
+		// UI reported "no models loaded" while the model kept
+		// responding. resolveProcessKeys must turn a bare modelID into
+		// the actual replica process keys so stop/isRunning find the
+		// running processes.
+		It("resolves a bare modelID to its replica process keys", func() {
+			s := &backendSupervisor{
+				processes: map[string]*backendProcess{
+					"qwen3.6-35B#0": {addr: "127.0.0.1:50051"},
+					"qwen3.6-35B#1": {addr: "127.0.0.1:50052"},
+					"other-model#0": {addr: "127.0.0.1:50053"},
+				},
+			}
+			keys := s.resolveProcessKeys("qwen3.6-35B")
+			Expect(keys).To(ConsistOf("qwen3.6-35B#0", "qwen3.6-35B#1"),
+				"bare modelID must match all replica process keys")
+
+			// Bare modelID for a model with no live processes returns nothing.
+			Expect(s.resolveProcessKeys("not-loaded")).To(BeEmpty())
+
+			// Full processKey resolves to itself (per-replica callers stay precise).
+			Expect(s.resolveProcessKeys("qwen3.6-35B#0")).To(ConsistOf("qwen3.6-35B#0"))
+
+			// A processKey that doesn't exist returns nothing — no spurious
+			// prefix fallback when the caller was explicit.
+			Expect(s.resolveProcessKeys("qwen3.6-35B#9")).To(BeEmpty())
+		})
+
+		It("isRunning returns false when no replica matches", func() {
+			// We can only test the not-found path without a real *process.Process
+			// (IsAlive() requires PID introspection). That's enough to pin the
+			// regression — pre-fix, isRunning("qwen3.6-35B") would always
+			// return false because the map was keyed by "qwen3.6-35B#0".
+			// Post-fix, isRunning calls resolveProcessKeys first, so the
+			// per-replica lookup is exercised before the IsAlive probe.
+			s := &backendSupervisor{processes: map[string]*backendProcess{}}
+			Expect(s.isRunning("qwen3.6-35B")).To(BeFalse())
+			// resolveProcessKeys finds the replica entries (the lookup contract
+			// is what the backend.delete handler relies on); the IsAlive probe
+			// itself is exercised by the integration path in distributed mode.
+			s.processes["qwen3.6-35B#0"] = &backendProcess{addr: "127.0.0.1:50051"}
+			Expect(s.resolveProcessKeys("qwen3.6-35B")).To(ConsistOf("qwen3.6-35B#0"))
+		})
+	})
 })

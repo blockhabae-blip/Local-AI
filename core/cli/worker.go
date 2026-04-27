@@ -502,16 +502,58 @@ func (s *backendSupervisor) startBackend(backend, backendPath string) (string, e
 	return clientAddr, nil
 }
 
-// stopBackend stops a specific backend's gRPC process.
-func (s *backendSupervisor) stopBackend(backend string) {
+// resolveProcessKeys turns a caller-supplied identifier into the set of
+// process map keys it refers to. PR #9583 changed s.processes to be keyed by
+// `modelID#replicaIndex`, but external NATS handlers still pass the bare
+// model ID — without this resolver, those lookups silently no-op'd, so
+// admin "Unload model" / "Delete backend" left the worker process alive.
+//
+//   - Exact match wins. Callers that already know the full processKey
+//     (stopAllBackends iterating its own map) get exactly that entry.
+//   - Else, an identifier without `#` is treated as a model prefix and
+//     every `id#N` replica is returned.
+//   - An identifier that contains `#` but doesn't match anything returns
+//     nothing — no spurious prefix fallback when the caller was explicit.
+func (s *backendSupervisor) resolveProcessKeys(id string) []string {
 	s.mu.Lock()
-	bp, ok := s.processes[backend]
+	defer s.mu.Unlock()
+	if _, ok := s.processes[id]; ok {
+		return []string{id}
+	}
+	if strings.Contains(id, "#") {
+		return nil
+	}
+	prefix := id + "#"
+	var keys []string
+	for k := range s.processes {
+		if strings.HasPrefix(k, prefix) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+// stopBackend stops the backend process(es) matching the given identifier.
+// Accepts a bare modelID (stops every replica) or a full processKey
+// (stops just that replica).
+func (s *backendSupervisor) stopBackend(id string) {
+	for _, key := range s.resolveProcessKeys(id) {
+		s.stopBackendExact(key)
+	}
+}
+
+// stopBackendExact stops the process under exactly this key. Locking and
+// network I/O are split: the map mutation runs under the lock, the gRPC
+// Free() and proc.Stop() calls run after release so they don't block
+// other supervisor operations.
+func (s *backendSupervisor) stopBackendExact(key string) {
+	s.mu.Lock()
+	bp, ok := s.processes[key]
 	if !ok || bp.proc == nil {
 		s.mu.Unlock()
 		return
 	}
-	// Clean up map and recycle port while holding lock
-	delete(s.processes, backend)
+	delete(s.processes, key)
 	if _, portStr, err := net.SplitHostPort(bp.addr); err == nil {
 		if p, err := strconv.Atoi(portStr); err == nil {
 			s.freePorts = append(s.freePorts, p)
@@ -519,16 +561,15 @@ func (s *backendSupervisor) stopBackend(backend string) {
 	}
 	s.mu.Unlock()
 
-	// Network I/O outside the lock
 	client := grpc.NewClientWithToken(bp.addr, false, nil, false, s.cmd.RegistrationToken)
-	xlog.Debug("Calling Free() before stopping backend", "backend", backend)
+	xlog.Debug("Calling Free() before stopping backend", "backend", key)
 	if err := client.Free(context.Background()); err != nil {
-		xlog.Warn("Free() failed (best-effort)", "backend", backend, "error", err)
+		xlog.Warn("Free() failed (best-effort)", "backend", key, "error", err)
 	}
 
-	xlog.Info("Stopping backend process", "backend", backend, "addr", bp.addr)
+	xlog.Info("Stopping backend process", "backend", key, "addr", bp.addr)
 	if err := bp.proc.Stop(); err != nil {
-		xlog.Error("Error stopping backend process", "backend", backend, "error", err)
+		xlog.Error("Error stopping backend process", "backend", key, "error", err)
 	}
 }
 
@@ -557,12 +598,24 @@ func readLastLinesFromFile(path string, n int) string {
 	return strings.Join(lines, "\n")
 }
 
-// isRunning returns whether a specific backend process is currently running.
-func (s *backendSupervisor) isRunning(backend string) bool {
+// isRunning returns whether at least one backend process matching the given
+// identifier is currently running. Accepts a bare modelID (matches any
+// replica) or a full processKey (exact match). Callers like the
+// backend.delete pre-check rely on the bare-name path.
+func (s *backendSupervisor) isRunning(id string) bool {
+	keys := s.resolveProcessKeys(id)
+	if len(keys) == 0 {
+		// Same lock-free zero-process check the caller would have done.
+		return false
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	bp, ok := s.processes[backend]
-	return ok && bp.proc != nil && bp.proc.IsAlive()
+	for _, key := range keys {
+		if bp, ok := s.processes[key]; ok && bp.proc != nil && bp.proc.IsAlive() {
+			return true
+		}
+	}
+	return false
 }
 
 // getAddr returns the gRPC address for a running backend, or empty string.
