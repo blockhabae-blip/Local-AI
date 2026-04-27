@@ -224,7 +224,8 @@ jobs:
             AMDGPU_TARGETS=${{ inputs.amdgpu-targets }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
-          cache-from: type=gha
+          cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache${{ inputs.tag-suffix }}
+          cache-to: type=registry,ref=quay.io/go-skynet/ci-cache:cache${{ inputs.tag-suffix }},mode=max,ignore-error=true
           platforms: ${{ inputs.platforms }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -246,7 +247,7 @@ jobs:
             AMDGPU_TARGETS=${{ inputs.amdgpu-targets }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
-          cache-from: type=gha
+          cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache${{ inputs.tag-suffix }}
           platforms: ${{ inputs.platforms }}
           push: ${{ env.quay_username != '' }}
           tags: ${{ steps.meta_pull_request.outputs.tags }}

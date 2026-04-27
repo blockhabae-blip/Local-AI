@@ -8,11 +8,6 @@ on:
         description: 'Base image'
         required: true
         type: string
-      grpc-base-image:
-        description: 'GRPC Base image, must be a compatible image with base-image'
-        required: false
-        default: ''
-        type: string
       build-type:
         description: 'Build type'
         default: ''
@@ -201,25 +196,19 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           builder: ${{ steps.buildx.outputs.name }}
-          # The build-args MUST be an EXACT match between the image cache and other workflow steps that want to use that cache.
-          # This means that even the MAKEFLAGS have to be an EXACT match.
-          # If the build-args are not an EXACT match, it will result in a cache miss, which will require GRPC to be built from scratch.
-          # This is why some build args like GRPC_VERSION and MAKEFLAGS are hardcoded
           build-args: |
             BUILD_TYPE=${{ inputs.build-type }}
             CUDA_MAJOR_VERSION=${{ inputs.cuda-major-version }}
             CUDA_MINOR_VERSION=${{ inputs.cuda-minor-version }}
             BASE_IMAGE=${{ inputs.base-image }}
-            GRPC_BASE_IMAGE=${{ inputs.grpc-base-image || inputs.base-image }}
-            GRPC_MAKEFLAGS=--jobs=4 --output-sync=target
-            GRPC_VERSION=v1.65.0
             MAKEFLAGS=${{ inputs.makeflags }}
             SKIP_DRIVERS=${{ inputs.skip-drivers }}
             UBUNTU_VERSION=${{ inputs.ubuntu-version }}
             UBUNTU_CODENAME=${{ inputs.ubuntu-codename }}
           context: .
           file: ./Dockerfile
-          cache-from: type=gha
+          cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache-localai${{ inputs.tag-suffix }}
+          cache-to: type=registry,ref=quay.io/go-skynet/ci-cache:cache-localai${{ inputs.tag-suffix }},mode=max,ignore-error=true
           platforms: ${{ inputs.platforms }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -230,25 +219,18 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           builder: ${{ steps.buildx.outputs.name }}
-          # The build-args MUST be an EXACT match between the image cache and other workflow steps that want to use that cache.
-          # This means that even the MAKEFLAGS have to be an EXACT match.
-          # If the build-args are not an EXACT match, it will result in a cache miss, which will require GRPC to be built from scratch.
-          # This is why some build args like GRPC_VERSION and MAKEFLAGS are hardcoded
           build-args: |
             BUILD_TYPE=${{ inputs.build-type }}
             CUDA_MAJOR_VERSION=${{ inputs.cuda-major-version }}
             CUDA_MINOR_VERSION=${{ inputs.cuda-minor-version }}
             BASE_IMAGE=${{ inputs.base-image }}
-            GRPC_BASE_IMAGE=${{ inputs.grpc-base-image || inputs.base-image }}
-            GRPC_MAKEFLAGS=--jobs=4 --output-sync=target
-            GRPC_VERSION=v1.65.0
             MAKEFLAGS=${{ inputs.makeflags }}
             SKIP_DRIVERS=${{ inputs.skip-drivers }}
             UBUNTU_VERSION=${{ inputs.ubuntu-version }}
             UBUNTU_CODENAME=${{ inputs.ubuntu-codename }}
           context: .
           file: ./Dockerfile
-          cache-from: type=gha
+          cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache-localai${{ inputs.tag-suffix }}
           platforms: ${{ inputs.platforms }}
           #push: true
           tags: ${{ steps.meta_pull_request.outputs.tags }}

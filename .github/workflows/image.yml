@@ -25,7 +25,6 @@
         platforms: ${{ matrix.platforms }}
         runs-on: ${{ matrix.runs-on }}
         base-image: ${{ matrix.base-image }}
-        grpc-base-image: ${{ matrix.grpc-base-image }}
         makeflags: ${{ matrix.makeflags }}
         ubuntu-version: ${{ matrix.ubuntu-version }}
         ubuntu-codename: ${{ matrix.ubuntu-codename }}
@@ -42,12 +41,11 @@
               tag-latest: 'auto'
               tag-suffix: '-gpu-hipblas'
               base-image: "rocm/dev-ubuntu-24.04:7.2.1"
-              grpc-base-image: "ubuntu:24.04"
               runs-on: 'ubuntu-latest'
               makeflags: "--jobs=3 --output-sync=target"
               ubuntu-version: '2404'
               ubuntu-codename: 'noble'
-  
+
     core-image-build:
       if: github.repository == 'mudler/LocalAI'
       uses: ./.github/workflows/image_build.yml
@@ -60,7 +58,6 @@
         platforms: ${{ matrix.platforms }}
         runs-on: ${{ matrix.runs-on }}
         base-image: ${{ matrix.base-image }}
-        grpc-base-image: ${{ matrix.grpc-base-image }}
         makeflags: ${{ matrix.makeflags }}
         skip-drivers: ${{ matrix.skip-drivers }}
         ubuntu-version: ${{ matrix.ubuntu-version }}
@@ -122,7 +119,6 @@
               platforms: 'linux/amd64'
               tag-latest: 'auto'
               base-image: "intel/oneapi-basekit:2025.3.2-0-devel-ubuntu24.04"
-              grpc-base-image: "ubuntu:24.04"
               tag-suffix: '-gpu-intel'
               runs-on: 'ubuntu-latest'
               makeflags: "--jobs=3 --output-sync=target"
@@ -141,7 +137,6 @@
         platforms: ${{ matrix.platforms }}
         runs-on: ${{ matrix.runs-on }}
         base-image: ${{ matrix.base-image }}
-        grpc-base-image: ${{ matrix.grpc-base-image }}
         makeflags: ${{ matrix.makeflags }}
         skip-drivers: ${{ matrix.skip-drivers }}
         ubuntu-version: ${{ matrix.ubuntu-version }}
