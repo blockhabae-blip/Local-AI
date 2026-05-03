@@ -28,11 +28,16 @@ inputs:
   self-hosted-mirror:
     description: 'archive/security mirror URL for self-hosted runners (empty = upstream)'
     required: false
-    default: 'https://mirrors.edge.kernel.org'
+    # HTTP, not HTTPS: the bare ubuntu:24.04 builder image doesn't ship
+    # ca-certificates, so the very first apt-get update over TLS would
+    # fail with "No system certificates available" before it can install
+    # anything. apt validates package integrity via GPG signatures, so
+    # plain HTTP is safe for the archive itself.
+    default: 'http://mirrors.edge.kernel.org'
   self-hosted-ports-mirror:
     description: 'ports.ubuntu.com mirror URL for self-hosted runners (empty = upstream)'
     required: false
-    default: 'https://mirrors.edge.kernel.org'
+    default: 'http://mirrors.edge.kernel.org'
 
 outputs:
   effective-mirror:
