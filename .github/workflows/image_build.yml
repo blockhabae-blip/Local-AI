@@ -56,16 +56,6 @@ on:
         required: false
         default: 'noble'
         type: string
-      apt-mirror:
-        description: 'Replacement URL for archive.ubuntu.com / security.ubuntu.com (empty = use upstream)'
-        required: false
-        default: 'http://azure.archive.ubuntu.com'
-        type: string
-      apt-ports-mirror:
-        description: 'Replacement URL for ports.ubuntu.com (arm64 etc., empty = use upstream)'
-        required: false
-        default: 'http://azure.ports.ubuntu.com'
-        type: string
     secrets:
       dockerUsername:
         required: true
@@ -84,10 +74,8 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure apt mirror on runner
+        id: apt_mirror
         uses: ./.github/actions/configure-apt-mirror
-        with:
-          mirror: ${{ inputs.apt-mirror }}
-          ports-mirror: ${{ inputs.apt-ports-mirror }}
 
       - name: Free Disk Space (Ubuntu)
         if: inputs.runs-on == 'ubuntu-latest'
@@ -214,8 +202,8 @@ jobs:
             SKIP_DRIVERS=${{ inputs.skip-drivers }}
             UBUNTU_VERSION=${{ inputs.ubuntu-version }}
             UBUNTU_CODENAME=${{ inputs.ubuntu-codename }}
-            APT_MIRROR=${{ inputs.apt-mirror }}
-            APT_PORTS_MIRROR=${{ inputs.apt-ports-mirror }}
+            APT_MIRROR=${{ steps.apt_mirror.outputs.effective-mirror }}
+            APT_PORTS_MIRROR=${{ steps.apt_mirror.outputs.effective-ports-mirror }}
           context: .
           file: ./Dockerfile
           cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache-localai${{ inputs.tag-suffix }}
@@ -239,8 +227,8 @@ jobs:
             SKIP_DRIVERS=${{ inputs.skip-drivers }}
             UBUNTU_VERSION=${{ inputs.ubuntu-version }}
             UBUNTU_CODENAME=${{ inputs.ubuntu-codename }}
-            APT_MIRROR=${{ inputs.apt-mirror }}
-            APT_PORTS_MIRROR=${{ inputs.apt-ports-mirror }}
+            APT_MIRROR=${{ steps.apt_mirror.outputs.effective-mirror }}
+            APT_PORTS_MIRROR=${{ steps.apt_mirror.outputs.effective-ports-mirror }}
           context: .
           file: ./Dockerfile
           cache-from: type=registry,ref=quay.io/go-skynet/ci-cache:cache-localai${{ inputs.tag-suffix }}
