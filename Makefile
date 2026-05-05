@@ -232,6 +232,20 @@ run-e2e-aio: protogen-go
 	@echo 'Running e2e AIO tests'
 	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --flake-attempts $(TEST_FLAKES) -v -r ./tests/e2e-aio
 
+# vLLM multi-node DP smoke (CPU). Builds local-ai:tests and the
+# cpu-vllm backend from the current working tree, then drives a
+# head + headless follower via testcontainers-go and asserts a chat
+# completion. BuildKit caches both images, so re-runs only rebuild
+# what changed. The test lives under tests/e2e/distributed and is
+# selected by the VLLMMultinode label so it doesn't run alongside
+# the other distributed-suite tests by default.
+test-e2e-vllm-multinode: docker-build-e2e extract-backend-vllm protogen-go
+	@echo 'Running e2e vLLM multi-node DP test'
+	LOCALAI_IMAGE=local-ai \
+	LOCALAI_IMAGE_TAG=tests \
+	LOCALAI_VLLM_BACKEND_DIR=$(abspath ./local-backends/vllm) \
+	$(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter='VLLMMultinode' -v -r ./tests/e2e/distributed
+
 ########################################################
 ## E2E tests
 ########################################################
@@ -319,7 +333,7 @@ local-backends:
 
 extract-backend-%: docker-build-% local-backends
 	@echo "Extracting backend $*..."
-	@CID=$$(docker create local-ai-backend:$*) && \
+	@CID=$$(docker create --entrypoint=/run.sh local-ai-backend:$*) && \
 	  rm -rf local-backends/$* && mkdir -p local-backends/$* && \
 	  docker cp $$CID:/ - | tar -xf - -C local-backends/$* && \
 	  docker rm $$CID > /dev/null
@@ -593,6 +607,14 @@ test-extra-backend-vllm: docker-build-vllm
 	BACKEND_TEST_CAPS=health,load,predict,stream,tools \
 	BACKEND_TEST_OPTIONS=tool_parser:hermes \
 	$(MAKE) test-extra-backend
+
+## vllm multi-node data-parallel smoke test. Runs LocalAI head + a
+## `local-ai p2p-worker vllm` follower in docker compose against
+## Qwen2.5-0.5B with data_parallel_size=2. Requires 2 NVIDIA GPUs and
+## nvidia-container-runtime on the host — vLLM v1's DP coordinator is
+## not viable on CPU so this cannot run in CI without GPU.
+test-extra-backend-vllm-multinode:
+	./tests/e2e/vllm-multinode/smoke.sh
 
 ## tinygrad mirrors the vllm target (same model, same caps, same parser) so
 ## the two backends are directly comparable. The LLM path covers Predict,
