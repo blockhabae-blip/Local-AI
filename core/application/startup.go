@@ -139,7 +139,7 @@ func New(opts ...config.AppOption) (*Application, error) {
 	}
 
 	// Initialize distributed mode services (NATS, object storage, node registry)
-	distSvc, err := initDistributed(options, application.authDB)
+	distSvc, err := initDistributed(options, application.authDB, application.ModelConfigLoader())
 	if err != nil {
 		return nil, fmt.Errorf("distributed mode initialization failed: %w", err)
 	}
@@ -679,6 +679,12 @@ func initializeWatchdog(application *Application, options *config.ApplicationCon
 			options.LRUEvictionMaxRetries,
 			options.LRUEvictionRetryInterval,
 		)
+
+		// Sync per-model state from configs to the watchdog. Without this,
+		// `pinned: true` and `concurrency_groups:` are only honored after a
+		// settings-driven RestartWatchdog and never at boot.
+		application.SyncPinnedModelsToWatchdog()
+		application.SyncModelGroupsToWatchdog()
 
 		// Start watchdog goroutine if any periodic checks are enabled
 		// LRU eviction doesn't need the Run() loop - it's triggered on model load
