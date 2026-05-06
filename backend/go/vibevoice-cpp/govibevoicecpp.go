@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	laudio "github.com/mudler/LocalAI/pkg/audio"
@@ -98,9 +99,18 @@ const asrMaxNewTokens = 16384
 const vibevoiceSampleRate = uint32(24000)
 
 // purego-bound entry points from libgovibevoicecpp.
+//
+// vv_capi_tts takes a `const char* const* ref_audio_paths` array (used
+// by the 1.5B variant for runtime voice cloning; the realtime-0.5B
+// path leaves it NULL and uses voice_path instead). purego marshals a
+// Go []*byte slice as **char by passing the underlying array's address.
+// A nil/empty slice marshals to NULL, which matches the C contract for
+// "no reference audio".
 var (
 	CppLoad func(ttsModel, asrModel, tokenizer, voice string, threads int32) int32
-	CppTTS  func(text, voicePath, dstWav string,
+	CppTTS  func(text, voicePath string,
+		refAudioPaths []*byte, nRefAudioPaths int32,
+		dstWav string,
 		nSteps int32, cfgScale float32, maxSpeechFrames int32, seed uint32) int32
 	CppASR func(srcWav string, outJSON []byte, capacity uint64,
 		maxNewTokens int32) int32
@@ -124,6 +134,14 @@ type VibevoiceCpp struct {
 	asrModel  string
 	tokenizer string
 	voice     string
+
+	// refAudio is the load-time default list of reference WAVs used by
+	// the 1.5B model (one per speaker). Sourced from
+	// ModelOptions.AudioPath (config_file's `audio_path:`) — comma-
+	// separated for multi-speaker. Per-call TTSRequest.Voice can
+	// override it. Empty for the realtime-0.5B path, which conditions
+	// on a pre-baked voice gguf via `voice` instead.
+	refAudio []string
 }
 
 // resolvePath joins a relative path onto `relTo`. The gallery
@@ -169,6 +187,25 @@ func (v *VibevoiceCpp) parseOptions(opts []string, relTo string) string {
 	return role
 }
 
+// parseRefAudio splits a comma-separated audio_path value into a
+// resolved list of WAVs. The 1.5B model uses one WAV per speaker;
+// callers that only need a single reference set audio_path to a single
+// path. Empty / whitespace-only entries are skipped.
+func parseRefAudio(audioPath, relTo string) []string {
+	if audioPath == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(audioPath, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, resolvePath(p, relTo))
+	}
+	return out
+}
+
 func (v *VibevoiceCpp) Load(opts *pb.ModelOptions) error {
 	if opts.ModelFile == "" {
 		return fmt.Errorf("vibevoice-cpp: ModelFile is required")
@@ -188,6 +225,12 @@ func (v *VibevoiceCpp) Load(opts *pb.ModelOptions) error {
 		v.modelRoot = filepath.Dir(modelFile)
 	}
 	role := v.parseOptions(opts.Options, v.modelRoot)
+
+	// 1.5B reference WAVs ride on ModelOptions.AudioPath (config_file's
+	// `audio_path:` key) — same convention other audio backends already
+	// follow. Single-speaker = single path; multi-speaker = comma list,
+	// one WAV per Speaker N: tag in TTSRequest.text.
+	v.refAudio = parseRefAudio(opts.AudioPath, v.modelRoot)
 
 	// ModelFile fills the "primary" role-slot determined by `type=`
 	// in Options (defaults to tts). The other slot stays exactly as
@@ -222,8 +265,8 @@ func (v *VibevoiceCpp) Load(opts *pb.ModelOptions) error {
 	v.threads = threads
 
 	fmt.Fprintf(os.Stderr,
-		"[vibevoice-cpp] Loading: tts=%q asr=%q tokenizer=%q voice=%q threads=%d\n",
-		v.ttsModel, v.asrModel, v.tokenizer, v.voice, threads)
+		"[vibevoice-cpp] Loading: tts=%q asr=%q tokenizer=%q voice=%q ref_audio=%v threads=%d\n",
+		v.ttsModel, v.asrModel, v.tokenizer, v.voice, v.refAudio, threads)
 
 	if rc := CppLoad(v.ttsModel, v.asrModel, v.tokenizer, v.voice, int32(threads)); rc != 0 {
 		return fmt.Errorf("vibevoice-cpp: vv_capi_load failed (rc=%d)", rc)
@@ -241,10 +284,35 @@ func (v *VibevoiceCpp) TTS(req *pb.TTSRequest) error {
 		return fmt.Errorf("vibevoice-cpp: TTS requires both text and dst")
 	}
 
-	// req.Voice may be a bare filename (e.g. "voice-en-Emma.gguf") or an
-	// absolute path. Resolve via the same modelRoot Load() used for
-	// Options[] so a swap-voice request mirrors the gallery's layout.
-	voice := resolvePath(req.Voice, v.modelRoot)
+	// TTSRequest.Voice carries the per-call override. Routing depends
+	// on the loaded model variant:
+	//   * realtime-0.5B → expects a baked voice .gguf (single path).
+	//   * 1.5B          → expects one or more raw 24 kHz mono .wav
+	//                     reference clips for runtime voice cloning;
+	//                     comma-separated to address multi-speaker
+	//                     dialogs (Speaker 0..n-1 follow the order).
+	// We pick the branch by extension / shape of the override; if no
+	// override is given, fall back to the load-time defaults.
+	voice := ""
+	var refAudio []string
+	if reqVoice := strings.TrimSpace(req.Voice); reqVoice != "" {
+		if isRefAudioOverride(reqVoice) {
+			for _, p := range strings.Split(reqVoice, ",") {
+				p = strings.TrimSpace(p)
+				if p == "" {
+					continue
+				}
+				refAudio = append(refAudio, resolvePath(p, v.modelRoot))
+			}
+		} else {
+			voice = resolvePath(reqVoice, v.modelRoot)
+		}
+	} else {
+		// No per-call override. v.voice already went to vv_capi_load
+		// for realtime-0.5B; ref_audio is per-call only on the C ABI,
+		// so the gallery's `ref_audio:` defaults are re-passed here.
+		refAudio = append(refAudio, v.refAudio...)
+	}
 
 	if req.Language != nil && *req.Language != "" {
 		fmt.Fprintf(os.Stderr,
@@ -257,11 +325,49 @@ func (v *VibevoiceCpp) TTS(req *pb.TTSRequest) error {
 		defaultMaxFrames = 200
 	)
 	defaultCfg := float32(1.3)
-	if rc := CppTTS(text, voice, dst,
-		int32(defaultSteps), defaultCfg, int32(defaultMaxFrames), 0); rc != 0 {
+
+	refPtrs, refKeep := newCStringArray(refAudio)
+	rc := CppTTS(text, voice, refPtrs, int32(len(refPtrs)), dst,
+		int32(defaultSteps), defaultCfg, int32(defaultMaxFrames), 0)
+	// Hold the backing buffers past the cgo call. purego marshals
+	// []*byte by handing the C side the underlying array address; the
+	// pointed-to NUL-terminated bytes must outlive the call.
+	runtime.KeepAlive(refKeep)
+	runtime.KeepAlive(refPtrs)
+	if rc != 0 {
 		return fmt.Errorf("vibevoice-cpp: vv_capi_tts failed (rc=%d)", rc)
 	}
 	return nil
+}
+
+// isRefAudioOverride decides whether a TTSRequest.Voice override should
+// be routed to ref_audio_paths (1.5B path) instead of voice_path
+// (realtime-0.5B). Either a comma-separated list (multi-speaker) or a
+// single .wav clip qualifies; a bare voice .gguf falls through.
+func isRefAudioOverride(s string) bool {
+	if strings.Contains(s, ",") {
+		return true
+	}
+	return strings.HasSuffix(strings.ToLower(s), ".wav")
+}
+
+// newCStringArray builds the **char array vv_capi_tts expects, plus the
+// keep-alive slice the caller must runtime.KeepAlive across the cgo
+// call. A nil/empty input returns (nil, nil) which purego marshals to
+// the C NULL pointer.
+func newCStringArray(in []string) ([]*byte, [][]byte) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+	keep := make([][]byte, len(in))
+	ptrs := make([]*byte, len(in))
+	for i, s := range in {
+		b := make([]byte, len(s)+1)
+		copy(b, s)
+		keep[i] = b
+		ptrs[i] = &b[0]
+	}
+	return ptrs, keep
 }
 
 // asrSegment matches vibevoice's JSON output:
