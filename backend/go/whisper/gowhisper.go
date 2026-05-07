@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/go-audio/wav"
 	"github.com/mudler/LocalAI/pkg/grpc/base"
 	pb "github.com/mudler/LocalAI/pkg/grpc/proto"
 	"github.com/mudler/LocalAI/pkg/utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -24,6 +28,7 @@ var (
 	CppNTokens                   func(i int) int
 	CppGetTokenID                func(i int, j int) int
 	CppGetSegmentSpeakerTurnNext func(i int) bool
+	CppSetAbort                  func(v int)
 )
 
 type Whisper struct {
@@ -92,7 +97,11 @@ func (w *Whisper) VAD(req *pb.VADRequest) (pb.VADResponse, error) {
 	}, nil
 }
 
-func (w *Whisper) AudioTranscription(opts *pb.TranscriptRequest) (pb.TranscriptResult, error) {
+func (w *Whisper) AudioTranscription(ctx context.Context, opts *pb.TranscriptRequest) (pb.TranscriptResult, error) {
+	if err := ctx.Err(); err != nil {
+		return pb.TranscriptResult{}, status.Error(codes.Canceled, "transcription cancelled")
+	}
+
 	dir, err := os.MkdirTemp("", "whisper")
 	if err != nil {
 		return pb.TranscriptResult{}, err
@@ -105,14 +114,12 @@ func (w *Whisper) AudioTranscription(opts *pb.TranscriptRequest) (pb.TranscriptR
 		return pb.TranscriptResult{}, err
 	}
 
-	// Open samples
 	fh, err := os.Open(convertedPath)
 	if err != nil {
 		return pb.TranscriptResult{}, err
 	}
 	defer fh.Close()
 
-	// Read samples
 	d := wav.NewDecoder(fh)
 	buf, err := d.FullPCMBuffer()
 	if err != nil {
@@ -120,8 +127,6 @@ func (w *Whisper) AudioTranscription(opts *pb.TranscriptRequest) (pb.TranscriptR
 	}
 
 	data := buf.AsFloat32Buffer().Data
-	// whisper.cpp resamples to 16 kHz internally; this matches buf.Format.SampleRate
-	// for the converted file produced by AudioToWav above.
 	var duration float32
 	if buf.Format != nil && buf.Format.SampleRate > 0 {
 		duration = float32(len(data)) / float32(buf.Format.SampleRate)
@@ -129,7 +134,31 @@ func (w *Whisper) AudioTranscription(opts *pb.TranscriptRequest) (pb.TranscriptR
 	segsLen := uintptr(0xdeadbeef)
 	segsLenPtr := unsafe.Pointer(&segsLen)
 
-	if ret := CppTranscribe(opts.Threads, opts.Language, opts.Translate, opts.Diarize, data, uintptr(len(data)), segsLenPtr, opts.Prompt); ret != 0 {
+	// Watcher: flips the C-side abort flag when ctx is cancelled. The
+	// goroutine is joined synchronously (close(done) signals it to exit,
+	// wg.Wait() blocks until it has) so a late CppSetAbort(1) cannot fire
+	// after the function returns and corrupt the next transcription call.
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		select {
+		case <-ctx.Done():
+			CppSetAbort(1)
+		case <-done:
+		}
+	}()
+	defer func() {
+		close(done)
+		wg.Wait()
+	}()
+
+	ret := CppTranscribe(opts.Threads, opts.Language, opts.Translate, opts.Diarize, data, uintptr(len(data)), segsLenPtr, opts.Prompt)
+	if ret == 2 {
+		return pb.TranscriptResult{}, status.Error(codes.Canceled, "transcription cancelled")
+	}
+	if ret != 0 {
 		return pb.TranscriptResult{}, fmt.Errorf("Failed Transcribe")
 	}
 
