@@ -4,6 +4,3 @@ certifi
 packaging
 setuptools
 poetry
-# Pin a modern omegaconf so pip doesn't backtrack to 1.x — old 1.x sdists
-# pull ruamel.yaml<0.15 whose setup.py is Python-2-only and fails to build.
-omegaconf>=2.0

@@ -3,6 +3,9 @@ torch
 torchaudio
 transformers
 numpy>=1.24.0,<1.26.0
+# Pin omegaconf so pip doesn't backtrack into 1.x sdists (whose
+# ruamel.yaml<0.15 dep has a Python-2-only setup.py and fails to build).
+omegaconf==2.3.0
 # https://github.com/mudler/LocalAI/pull/6240#issuecomment-3329518289
 chatterbox-tts@git+https://git@github.com/mudler/chatterbox.git@faster
 accelerate
