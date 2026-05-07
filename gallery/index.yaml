@@ -25280,6 +25280,7 @@
       - sampler:euler
       - llm_path:stablediffusion-cpp/models/Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf
       - offload_params_to_cpu:true
+      - vae_decode_only:false
     parameters:
       model: stablediffusion-cpp/models/flux2-dev-Q4_K_M.gguf
     step: 50
@@ -25323,6 +25324,7 @@
       - sampler:euler
       - llm_path:stablediffusion-cpp/models/Qwen3-4B-Q4_K_M.gguf
       - offload_params_to_cpu:true
+      - vae_decode_only:false
     parameters:
       model: stablediffusion-cpp/models/flux-2-klein-4b-Q4_0.gguf
     step: 4
@@ -25366,6 +25368,7 @@
       - sampler:euler
       - llm_path:stablediffusion-cpp/models/Qwen3-8B-Q4_K_M.gguf
       - offload_params_to_cpu:true
+      - vae_decode_only:false
     parameters:
       model: stablediffusion-cpp/models/flux-2-klein-9b-Q4_0.gguf
     step: 4
