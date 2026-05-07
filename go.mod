@@ -94,11 +94,11 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
-	github.com/gen2brain/go-fitz v1.24.15 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/jupiterrider/ffi v0.5.0 // indirect
+	github.com/jolestar/go-commons-pool/v2 v2.1.2 // indirect
+	github.com/klippa-app/go-pdfium v1.19.2 // indirect
 	github.com/mattn/go-sqlite3 v1.14.24 // indirect
 	github.com/moby/moby/api v1.54.1 // indirect
 	github.com/moby/moby/client v0.4.0 // indirect
@@ -107,6 +107,7 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/sv-tools/openapi v0.2.1 // indirect
 	github.com/swaggo/swag/v2 v2.0.0-rc4 // indirect
+	github.com/tetratelabs/wazero v1.11.0 // indirect
 	github.com/tmc/langchaingo v0.1.14 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
@@ -171,8 +172,8 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/mudler/LocalAGI v0.0.0-20260506230719-facd8881b135
-	github.com/mudler/localrecall v0.6.0 // indirect
+	github.com/mudler/LocalAGI v0.0.0-20260507074708-c1a12317930d
+	github.com/mudler/localrecall v0.6.1-0.20260507074622-a7724fef6f81 // indirect
 	github.com/mudler/skillserver v0.0.6
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/oxffaa/gopher-parse-sitemap v0.0.0-20191021113419-005d2eb1def4 // indirect
