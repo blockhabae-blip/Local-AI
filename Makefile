@@ -594,6 +594,7 @@ test-extra-backend-llama-cpp-transcription: docker-build-llama-cpp
 	BACKEND_TEST_MMPROJ_URL=https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf \
 	BACKEND_TEST_AUDIO_URL=https://github.com/ggml-org/whisper.cpp/raw/master/samples/jfk.wav \
 	BACKEND_TEST_CAPS=health,load,transcription \
+	BACKEND_TEST_CTX_SIZE=2048 \
 	$(MAKE) test-extra-backend
 
 ## vllm is resolved from a HuggingFace model id (no file download) and
