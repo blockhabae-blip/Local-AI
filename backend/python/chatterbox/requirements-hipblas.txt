@@ -3,9 +3,17 @@ torch==2.10.0+rocm7.0
 torchaudio==2.10.0+rocm7.0
 transformers
 numpy>=1.24.0,<1.26.0
-# Pin omegaconf so pip doesn't backtrack into 1.x sdists (whose
-# ruamel.yaml<0.15 dep has a Python-2-only setup.py and fails to build).
+# chatterbox-tts itself is installed with --no-deps in install.sh.
+# These are its real runtime deps, mirroring upstream's pyproject.toml
+# minus russian-text-stresser (whose ancient pins break the resolver).
 omegaconf==2.3.0
-# https://github.com/mudler/LocalAI/pull/6240#issuecomment-3329518289
-chatterbox-tts@git+https://git@github.com/mudler/chatterbox.git@faster
+resampy==0.4.3
+librosa
+s3tokenizer
+diffusers
+resemble-perth==1.0.1
+conformer
+safetensors
+spacy-pkuseg
+pykakasi==2.3.0
 accelerate
