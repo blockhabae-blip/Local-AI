@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -160,6 +161,11 @@ func API(application *application.Application) (*echo.Echo, error) {
 		})
 	}
 
+	// Security headers (CSP, X-Content-Type-Options, X-Frame-Options,
+	// Referrer-Policy). Set early so every response — including 404s and
+	// errors — picks them up.
+	e.Use(httpMiddleware.SecurityHeaders())
+
 	// Custom logger middleware using xlog
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -277,13 +283,19 @@ func API(application *application.Application) (*echo.Echo, error) {
 		e.Use(auth.RequireQuota(application.AuthDB()))
 	}
 
-	// CORS middleware
+	// CORS middleware. When CORS=true the operator must also specify the
+	// allowed origins; an empty allowlist would otherwise let Echo fall back
+	// to AllowOrigins=["*"], which is almost never what someone enabling
+	// "strict CORS" intended.
 	if application.ApplicationConfig().CORS {
-		corsConfig := middleware.CORSConfig{}
-		if application.ApplicationConfig().CORSAllowOrigins != "" {
-			corsConfig.AllowOrigins = strings.Split(application.ApplicationConfig().CORSAllowOrigins, ",")
+		if application.ApplicationConfig().CORSAllowOrigins == "" {
+			xlog.Warn("LOCALAI_CORS=true but LOCALAI_CORS_ALLOW_ORIGINS is empty; refusing to register a wildcard CORS policy. Set the allowlist or unset LOCALAI_CORS.")
+		} else {
+			corsConfig := middleware.CORSConfig{
+				AllowOrigins: strings.Split(application.ApplicationConfig().CORSAllowOrigins, ","),
+			}
+			e.Use(middleware.CORSWithConfig(corsConfig))
 		}
-		e.Use(middleware.CORSWithConfig(corsConfig))
 	} else {
 		e.Use(middleware.CORS())
 	}
@@ -424,10 +436,11 @@ func API(application *application.Application) (*echo.Echo, error) {
 				if err != nil {
 					return c.String(http.StatusNotFound, "React UI not built")
 				}
-				// Inject <base href> for reverse-proxy support
+				// Inject <base href> for reverse-proxy support; baseURL comes
+				// from attacker-controllable Host / X-Forwarded-Host headers.
 				baseURL := httpMiddleware.BaseURL(c)
 				if baseURL != "" {
-					baseTag := `<base href="` + baseURL + `" />`
+					baseTag := `<base href="` + httpMiddleware.SecureBaseHref(baseURL) + `" />`
 					indexHTML = []byte(strings.Replace(string(indexHTML), "<head>", "<head>\n  "+baseTag, 1))
 				}
 				return c.HTMLBlob(http.StatusOK, indexHTML)
@@ -440,9 +453,11 @@ func API(application *application.Application) (*echo.Echo, error) {
 			e.GET("/app", serveIndex)
 			e.GET("/app/*", serveIndex)
 
-			// prefixRedirect performs a redirect that preserves X-Forwarded-Prefix for reverse-proxy support.
+			// prefixRedirect performs a redirect that preserves X-Forwarded-Prefix
+			// for reverse-proxy support. The prefix is forgeable on misconfigured
+			// proxy chains, so reject anything that isn't a same-origin path.
 			prefixRedirect := func(c echo.Context, target string) error {
-				if prefix := c.Request().Header.Get("X-Forwarded-Prefix"); prefix != "" {
+				if prefix, ok := httpMiddleware.SafeForwardedPrefix(c.Request().Header.Get("X-Forwarded-Prefix")); ok {
 					target = strings.TrimSuffix(prefix, "/") + target
 				}
 				return c.Redirect(http.StatusMovedPermanently, target)
@@ -489,6 +504,21 @@ func API(application *application.Application) (*echo.Echo, error) {
 	routes.RegisterJINARoutes(e, requestExtractor, application.ModelConfigLoader(), application.ModelLoader(), application.ApplicationConfig())
 
 	// Note: 404 handling is done via HTTPErrorHandler above, no need for catch-all route
+
+	// HTTP server timeouts.
+	//
+	//   - ReadHeaderTimeout: bounds the slow-headers Slowloris case. 30s is
+	//     enough for a real client on a poor connection but cuts off a
+	//     drip-feeding attacker.
+	//   - IdleTimeout: bounds idle keep-alive connections.
+	//
+	// We deliberately leave ReadTimeout and WriteTimeout at 0:
+	//   - Request bodies can be multi-GB model/dataset uploads.
+	//   - Chat-completion and SSE responses can stream for many minutes.
+	// Operators who need stricter limits should front the server with a
+	// reverse proxy that terminates slow clients per-request.
+	e.Server.ReadHeaderTimeout = 30 * time.Second
+	e.Server.IdleTimeout = 120 * time.Second
 
 	// Log startup message
 	e.Server.RegisterOnShutdown(func() {

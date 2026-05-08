@@ -272,15 +272,11 @@ func (s URI) ResolveURL() string {
 }
 
 func removePartialFile(tmpFilePath string) error {
-	_, err := os.Stat(tmpFilePath)
-	if err == nil {
-		xlog.Debug("Removing temporary file", "file", tmpFilePath)
-		err = os.Remove(tmpFilePath)
-		if err != nil {
-			err1 := fmt.Errorf("failed to remove temporary download file %s: %v", tmpFilePath, err)
-			xlog.Warn("failed to remove temporary download file", "error", err1)
-			return err1
-		}
+	xlog.Debug("Removing temporary file", "file", tmpFilePath)
+	if err := os.Remove(tmpFilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		err1 := fmt.Errorf("failed to remove temporary download file %s: %v", tmpFilePath, err)
+		xlog.Warn("failed to remove temporary download file", "error", err1)
+		return err1
 	}
 	return nil
 }
@@ -578,20 +574,28 @@ func (uri URI) DownloadFileWithContext(ctx context.Context, filePath, sha string
 	default:
 	}
 
-	err = os.Rename(tmpFilePath, filePath)
-	if err != nil {
-		return fmt.Errorf("failed to rename temporary file %s -> %s: %v", tmpFilePath, filePath, err)
-	}
-
+	// Invariant: verify the streamed hash before promoting the temp file to
+	// the final path. Renaming first would leave tampered content reachable
+	// to subsequent readers even though we return an error.
 	if sha != "" {
-		// Verify SHA
 		calculatedSHA := fmt.Sprintf("%x", progress.hash.Sum(nil))
 		if calculatedSHA != sha {
 			xlog.Debug("SHA mismatch for file", "file", filePath, "calculated", calculatedSHA, "metadata", sha)
+			_ = removePartialFile(tmpFilePath)
 			return fmt.Errorf("SHA mismatch for file %q ( calculated: %s != metadata: %s )", filePath, calculatedSHA, sha)
 		}
 	} else {
-		xlog.Debug("SHA missing. Skipping validation", "file", filePath)
+		// Visible at the default log level so missing-digest configs are
+		// noticed; silent acceptance was the historical bug.
+		xlog.Warn("downloading without integrity check — supplied SHA is empty",
+			"file", filePath,
+			"url", url,
+		)
+	}
+
+	err = os.Rename(tmpFilePath, filePath)
+	if err != nil {
+		return fmt.Errorf("failed to rename temporary file %s -> %s: %v", tmpFilePath, filePath, err)
 	}
 
 	xlog.Info("File downloaded and verified", "file", filePath)
