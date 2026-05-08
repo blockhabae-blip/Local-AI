@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -289,13 +290,27 @@ func (f *stubClientFactory) NewClient(_ string, _ bool) grpc.Backend {
 // ---------------------------------------------------------------------------
 
 type fakeUnloader struct {
+	// mu guards installCalls and upgradeCalls so concurrent test
+	// goroutines (e.g. singleflight specs) don't race the slice appends.
+	mu sync.Mutex
+
 	installReply *messaging.BackendInstallReply
 	installErr   error
 	installCalls []installCall // every InstallBackend invocation, in order
-	stopCalls    []string      // "nodeID:model"
-	stopErr      error
-	unloadCalls  []string
-	unloadErr    error
+	// installHook, if non-nil, runs at the start of InstallBackend before
+	// the call is recorded. Used by concurrency tests as a deterministic
+	// "block here" seam — set installHook to a function that sleeps or
+	// blocks on a channel to overlap two callers.
+	installHook func()
+
+	upgradeReply *messaging.BackendUpgradeReply
+	upgradeErr   error
+	upgradeCalls []upgradeCall // every UpgradeBackend invocation, in order
+
+	stopCalls   []string // "nodeID:model"
+	stopErr     error
+	unloadCalls []string
+	unloadErr   error
 }
 
 // installCall captures the args we care about when asserting that the
@@ -307,12 +322,32 @@ type installCall struct {
 	backend string
 	modelID string
 	replica int
-	force   bool
 }
 
-func (f *fakeUnloader) InstallBackend(nodeID, backend, modelID, _, _, _, _ string, replica int, force bool) (*messaging.BackendInstallReply, error) {
-	f.installCalls = append(f.installCalls, installCall{nodeID, backend, modelID, replica, force})
+type upgradeCall struct {
+	nodeID  string
+	backend string
+	replica int
+}
+
+func (f *fakeUnloader) InstallBackend(nodeID, backend, modelID, _, _, _, _ string, replica int) (*messaging.BackendInstallReply, error) {
+	// installHook intentionally runs OUTSIDE the mutex: the hook may block
+	// on a channel and we don't want to serialize concurrent callers,
+	// which would defeat the singleflight-overlap test.
+	if f.installHook != nil {
+		f.installHook()
+	}
+	f.mu.Lock()
+	f.installCalls = append(f.installCalls, installCall{nodeID, backend, modelID, replica})
+	f.mu.Unlock()
 	return f.installReply, f.installErr
+}
+
+func (f *fakeUnloader) UpgradeBackend(nodeID, backend, _, _, _, _ string, replica int) (*messaging.BackendUpgradeReply, error) {
+	f.mu.Lock()
+	f.upgradeCalls = append(f.upgradeCalls, upgradeCall{nodeID, backend, replica})
+	f.mu.Unlock()
+	return f.upgradeReply, f.upgradeErr
 }
 
 func (f *fakeUnloader) DeleteBackend(_, _ string) (*messaging.BackendDeleteReply, error) {
@@ -949,6 +984,70 @@ var _ = Describe("SmartRouter", func() {
 			out, err := plain.narrowByGroupAntiAffinity(ctx, "b", candidates)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out).To(Equal(candidates))
+		})
+	})
+
+	Describe("installBackendOnNode singleflight", func() {
+		It("coalesces concurrent identical installs into one NATS call", func() {
+			node := &BackendNode{ID: "n1", Name: "node-1", Address: "10.0.0.1:50051"}
+
+			// Slow install reply so concurrent calls overlap deterministically.
+			started := make(chan struct{}, 5)
+			release := make(chan struct{})
+			unloader := &fakeUnloader{
+				installReply: &messaging.BackendInstallReply{Success: true, Address: "10.0.0.1:50100"},
+			}
+			unloader.installHook = func() {
+				started <- struct{}{}
+				<-release
+			}
+
+			router := NewSmartRouter(&fakeModelRouter{}, SmartRouterOptions{
+				Unloader:      unloader,
+				ClientFactory: &stubClientFactory{client: &stubBackend{}},
+			})
+
+			// Fire 5 concurrent identical installBackendOnNode calls.
+			done := make(chan error, 5)
+			for i := 0; i < 5; i++ {
+				go func() {
+					_, err := router.installBackendOnNode(context.Background(), node, "llama-cpp", "my-model", 0)
+					done <- err
+				}()
+			}
+
+			// Only ONE call should have entered the unloader hook (the
+			// singleflight leader). The other 4 are coalesced and waiting on
+			// the leader's result.
+			Eventually(started).Should(Receive())
+			Consistently(started, 100*time.Millisecond).ShouldNot(Receive())
+
+			// Release the leader; the other 4 callers receive the same result.
+			close(release)
+			for i := 0; i < 5; i++ {
+				Expect(<-done).ToNot(HaveOccurred())
+			}
+			Expect(unloader.installCalls).To(HaveLen(1),
+				"singleflight should coalesce 5 concurrent identical loads into 1 NATS call")
+		})
+
+		It("does NOT coalesce installs for different (modelID, replica) keys", func() {
+			node := &BackendNode{ID: "n1", Name: "node-1", Address: "10.0.0.1:50051"}
+			unloader := &fakeUnloader{
+				installReply: &messaging.BackendInstallReply{Success: true, Address: "10.0.0.1:50100"},
+			}
+			router := NewSmartRouter(&fakeModelRouter{}, SmartRouterOptions{
+				Unloader:      unloader,
+				ClientFactory: &stubClientFactory{client: &stubBackend{}},
+			})
+
+			_, err1 := router.installBackendOnNode(context.Background(), node, "llama-cpp", "model-A", 0)
+			_, err2 := router.installBackendOnNode(context.Background(), node, "llama-cpp", "model-B", 0)
+			_, err3 := router.installBackendOnNode(context.Background(), node, "llama-cpp", "model-A", 1)
+			Expect(err1).ToNot(HaveOccurred())
+			Expect(err2).ToNot(HaveOccurred())
+			Expect(err3).ToNot(HaveOccurred())
+			Expect(unloader.installCalls).To(HaveLen(3))
 		})
 	})
 })
