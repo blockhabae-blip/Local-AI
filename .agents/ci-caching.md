@@ -13,7 +13,7 @@ Container builds — both the root LocalAI image (`Dockerfile`) and the per-back
 | `.github/workflows/backend_build_darwin.yml` | Reusable: macOS-native backend builds | `workflow_call` |
 | `.github/workflows/image.yml` / `image-pr.yml` | Root LocalAI image (push / PR) | push / PR |
 | `.github/workflows/image_build.yml` / `image_merge.yml` | Reusable: per-arch root-image build + merge | `workflow_call` |
-| `.github/workflows/base-images.yml` | Builds the prebuilt `base-grpc-*` builder bases | Saturdays 05:00 UTC cron, `workflow_dispatch`, master push touching the base Dockerfile/workflow |
+| `.github/workflows/base-images.yml` | Builds the prebuilt `base-grpc-*` builder bases | Saturdays 05:00 UTC cron, `workflow_dispatch`, master push touching `Dockerfile.base-grpc-builder`, `.docker/install-base-deps.sh`, `.docker/apt-mirror.sh`, or this workflow |
 
 The matrix that drives `backend.yml` / `backend_pr.yml` lives in **`.github/backend-matrix.yml`** (data-only YAML, not embedded in the workflow). `scripts/changed-backends.js` parses it, applies path-filter logic against the PR diff (PR events) or the GitHub Compare API (push events), and emits the filtered matrix plus a `merge-matrix` for backends with multiple per-arch entries.
 
