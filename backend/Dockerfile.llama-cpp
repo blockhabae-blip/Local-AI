@@ -265,12 +265,26 @@ COPY --from=grpc /opt/grpc /usr/local
 
 COPY . /LocalAI
 
-RUN <<'EOT' bash
+# BuildKit cache mount for ccache. Persists compiler outputs across builds
+# via the registry cache (cache-to: type=registry,mode=max in CI). On a
+# LLAMA_VERSION bump most TUs are byte-identical to the previous version's
+# preprocessed source — ccache returns the previous .o file and skips the
+# real compile. Same for LocalAI source changes that don't touch llama.cpp.
+# CMAKE_*_COMPILER_LAUNCHER threads ccache through CMake to wrap gcc/g++/nvcc.
+# sharing=locked serializes concurrent writes if multiple matrix variants
+# share the same cache mount id.
+RUN --mount=type=cache,target=/root/.ccache,id=llama-cpp-ccache-${TARGETARCH}-${BUILD_TYPE},sharing=locked <<'EOT' bash
 set -euxo pipefail
+
+export CCACHE_DIR=/root/.ccache
+ccache --max-size=5G || true
+ccache -z || true
+
+export CMAKE_ARGS="${CMAKE_ARGS:-} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache"
 
 if [[ -n "${CUDA_DOCKER_ARCH:-}" ]]; then
   CUDA_ARCH_ESC="${CUDA_DOCKER_ARCH//;/\\;}"
-  export CMAKE_ARGS="${CMAKE_ARGS:-} -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH_ESC}"
+  export CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH_ESC}"
   echo "CMAKE_ARGS(env) = ${CMAKE_ARGS}"
   rm -rf /LocalAI/backend/cpp/llama-cpp-*-build
 fi
@@ -289,6 +303,8 @@ else
   make llama-cpp-grpc
   make llama-cpp-rpc-server
 fi
+
+ccache -s || true
 EOT
 
 
