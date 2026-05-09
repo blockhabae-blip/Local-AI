@@ -28,6 +28,11 @@ on:
     paths:
       - 'backend/Dockerfile.base-grpc-builder'
       - '.github/workflows/base-images.yml'
+      # The install logic and apt-mirror helper are bind-mounted into
+      # Dockerfile.base-grpc-builder at build time — changes to either
+      # affect the produced base images and must trigger a rebuild.
+      - '.docker/install-base-deps.sh'
+      - '.docker/apt-mirror.sh'
 
 concurrency:
   group: ci-base-images-${{ github.event.pull_request.number || github.sha }}-${{ github.repository }}
