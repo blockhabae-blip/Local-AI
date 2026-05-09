@@ -259,12 +259,22 @@ COPY --from=grpc /opt/grpc /usr/local
 
 COPY . /LocalAI
 
-RUN <<'EOT' bash
+# BuildKit cache mount for ccache. See Dockerfile.llama-cpp (commit 9228e5b4)
+# for the rationale. Distinct mount id so ik-llama-cpp's cache doesn't
+# overlap with llama-cpp's — ik_llama.cpp is a different fork with
+# different source.
+RUN --mount=type=cache,target=/root/.ccache,id=ik-llama-cpp-ccache-${TARGETARCH}-${BUILD_TYPE},sharing=locked <<'EOT' bash
 set -euxo pipefail
+
+export CCACHE_DIR=/root/.ccache
+ccache --max-size=5G || true
+ccache -z || true
+
+export CMAKE_ARGS="${CMAKE_ARGS:-} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache"
 
 if [[ -n "${CUDA_DOCKER_ARCH:-}" ]]; then
   CUDA_ARCH_ESC="${CUDA_DOCKER_ARCH//;/\\;}"
-  export CMAKE_ARGS="${CMAKE_ARGS:-} -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH_ESC}"
+  export CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH_ESC}"
   echo "CMAKE_ARGS(env) = ${CMAKE_ARGS}"
   rm -rf /LocalAI/backend/cpp/ik-llama-cpp-*-build
 fi
@@ -278,6 +288,8 @@ else
   # ik_llama.cpp's IQK kernels require at least AVX2
   make ik-llama-cpp-avx2
 fi
+
+ccache -s || true
 EOT
 
 
