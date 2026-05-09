@@ -3,12 +3,6 @@ name: 'E2E Backend Tests'
 
 on:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - 'examples/**'
-      - 'README.md'
-      - '**/*.md'
-      - 'backend/**'
   push:
     branches:
       - master
