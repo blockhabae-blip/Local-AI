@@ -194,7 +194,18 @@ var _ = Describe("Backend container", Ordered, func() {
 
 	BeforeAll(func() {
 		image := os.Getenv("BACKEND_IMAGE")
-		Expect(image).NotTo(BeEmpty(), "BACKEND_IMAGE env var must be set (e.g. local-ai-backend:llama-cpp)")
+		// BACKEND_BINARY is an escape hatch for hardware-gated backends (e.g. ds4)
+		// where building a full Docker image around an 80+ GB model is impractical.
+		// Points at a `run.sh` produced by `make -C backend/cpp/<name> package`.
+		binary := os.Getenv("BACKEND_BINARY")
+		Expect(image != "" || binary != "").To(BeTrue(),
+			"either BACKEND_IMAGE or BACKEND_BINARY env var must be set")
+		Expect(image != "" && binary != "").To(BeFalse(),
+			"BACKEND_IMAGE and BACKEND_BINARY are mutually exclusive")
+		if binary != "" {
+			Expect(filepath.Base(binary)).To(Equal("run.sh"),
+				"BACKEND_BINARY must point at a run.sh produced by 'make -C backend/cpp/<name> package'")
+		}
 
 		modelURL := os.Getenv("BACKEND_TEST_MODEL_URL")
 		modelFile = os.Getenv("BACKEND_TEST_MODEL_FILE")
@@ -203,7 +214,11 @@ var _ = Describe("Backend container", Ordered, func() {
 			"one of BACKEND_TEST_MODEL_URL, BACKEND_TEST_MODEL_FILE, or BACKEND_TEST_MODEL_NAME must be set")
 
 		caps = parseCaps()
-		GinkgoWriter.Printf("Testing image=%q with capabilities=%v\n", image, keys(caps))
+		src := image
+		if src == "" {
+			src = binary
+		}
+		GinkgoWriter.Printf("Testing src=%q with capabilities=%v\n", src, keys(caps))
 
 		prompt = os.Getenv("BACKEND_TEST_PROMPT")
 		if prompt == "" {
@@ -223,10 +238,13 @@ var _ = Describe("Backend container", Ordered, func() {
 		workDir, err = os.MkdirTemp("", "backend-e2e-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		// Extract the image filesystem so we can run run.sh directly.
-		binaryDir = filepath.Join(workDir, "rootfs")
-		Expect(os.MkdirAll(binaryDir, 0o755)).To(Succeed())
-		extractImage(image, binaryDir)
+		if image != "" {
+			binaryDir = filepath.Join(workDir, "rootfs")
+			Expect(os.MkdirAll(binaryDir, 0o755)).To(Succeed())
+			extractImage(image, binaryDir)
+		} else {
+			binaryDir = filepath.Dir(binary)
+		}
 		Expect(filepath.Join(binaryDir, "run.sh")).To(BeAnExistingFile())
 
 		// Download the model once if not provided and no HF name given.
