@@ -228,11 +228,18 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
+      # Artifact name uses a `--` separator between tag-suffix and platform-tag
+      # to avoid prefix collisions during the merge job's pattern-based download.
+      # Tag-suffixes are not prefix-disjoint (e.g. -gpu-nvidia-cuda-12-vllm is a
+      # prefix of -gpu-nvidia-cuda-12-vllm-omni); a single `-` separator plus the
+      # merge-side `digests<tag-suffix>-*` glob would let one merge over-match
+      # the other backend's artifacts. The `-single` placeholder for empty
+      # platform-tag (single-arch entries) keeps the artifact name non-trailing.
       - name: Upload digest artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: digests${{ inputs.tag-suffix }}-${{ inputs.platform-tag }}
+          name: digests${{ inputs.tag-suffix }}--${{ inputs.platform-tag || 'single' }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1

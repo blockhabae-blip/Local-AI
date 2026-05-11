@@ -14,11 +14,13 @@ jobs:
       matrix-singlearch: ${{ steps.set-matrix.outputs['matrix-singlearch'] }}
       matrix-multiarch: ${{ steps.set-matrix.outputs['matrix-multiarch'] }}
       matrix-darwin: ${{ steps.set-matrix.outputs['matrix-darwin'] }}
-      merge-matrix: ${{ steps.set-matrix.outputs['merge-matrix'] }}
+      merge-matrix-multiarch: ${{ steps.set-matrix.outputs['merge-matrix-multiarch'] }}
+      merge-matrix-singlearch: ${{ steps.set-matrix.outputs['merge-matrix-singlearch'] }}
       has-backends-singlearch: ${{ steps.set-matrix.outputs['has-backends-singlearch'] }}
       has-backends-multiarch: ${{ steps.set-matrix.outputs['has-backends-multiarch'] }}
       has-backends-darwin: ${{ steps.set-matrix.outputs['has-backends-darwin'] }}
-      has-merges: ${{ steps.set-matrix.outputs['has-merges'] }}
+      has-merges-multiarch: ${{ steps.set-matrix.outputs['has-merges-multiarch'] }}
+      has-merges-singlearch: ${{ steps.set-matrix.outputs['has-merges-singlearch'] }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -97,12 +99,12 @@ jobs:
       fail-fast: true
       max-parallel: 8
       matrix: ${{ fromJson(needs.generate-matrix.outputs['matrix-singlearch']) }}
-  backend-merge-jobs:
+  backend-merge-jobs-multiarch:
     needs: [generate-matrix, backend-jobs-multiarch]
     # backend_merge.yml's push-side steps are all gated on
     # github.event_name != 'pull_request', so on a PR the merge job would
     # do nothing. Skip it entirely to avoid spinning up an empty runner.
-    if: github.event_name != 'pull_request' && needs.generate-matrix.outputs['has-merges'] == 'true'
+    if: github.event_name != 'pull_request' && needs.generate-matrix.outputs['has-merges-multiarch'] == 'true'
     uses: ./.github/workflows/backend_merge.yml
     with:
       tag-latest: ${{ matrix.tag-latest }}
@@ -112,7 +114,21 @@ jobs:
       quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.generate-matrix.outputs['merge-matrix']) }}
+      matrix: ${{ fromJson(needs.generate-matrix.outputs['merge-matrix-multiarch']) }}
+
+  backend-merge-jobs-singlearch:
+    needs: [generate-matrix, backend-jobs-singlearch]
+    if: github.event_name != 'pull_request' && needs.generate-matrix.outputs['has-merges-singlearch'] == 'true'
+    uses: ./.github/workflows/backend_merge.yml
+    with:
+      tag-latest: ${{ matrix.tag-latest }}
+      tag-suffix: ${{ matrix.tag-suffix }}
+    secrets:
+      quayUsername: ${{ secrets.LOCALAI_REGISTRY_USERNAME }}
+      quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs['merge-matrix-singlearch']) }}
   backend-jobs-darwin:
     needs: generate-matrix
     uses: ./.github/workflows/backend_build_darwin.yml

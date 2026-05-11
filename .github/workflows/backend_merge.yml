@@ -34,10 +34,14 @@ jobs:
     env:
       quay_username: ${{ secrets.quayUsername }}
     steps:
+      # `--` separator anchors the glob so we don't over-match sibling
+      # backends whose tag-suffix happens to be a prefix of ours
+      # (e.g. -cpu-vllm vs -cpu-vllm-omni). Must stay in sync with the
+      # upload-artifact name in backend_build.yml.
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          pattern: digests${{ inputs.tag-suffix }}-*
+          pattern: digests${{ inputs.tag-suffix }}--*
           merge-multiple: true
           path: /tmp/digests
 

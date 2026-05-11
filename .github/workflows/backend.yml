@@ -35,11 +35,13 @@ jobs:
       matrix-singlearch: ${{ steps.set-matrix.outputs['matrix-singlearch'] }}
       matrix-multiarch: ${{ steps.set-matrix.outputs['matrix-multiarch'] }}
       matrix-darwin: ${{ steps.set-matrix.outputs['matrix-darwin'] }}
-      merge-matrix: ${{ steps.set-matrix.outputs['merge-matrix'] }}
+      merge-matrix-multiarch: ${{ steps.set-matrix.outputs['merge-matrix-multiarch'] }}
+      merge-matrix-singlearch: ${{ steps.set-matrix.outputs['merge-matrix-singlearch'] }}
       has-backends-singlearch: ${{ steps.set-matrix.outputs['has-backends-singlearch'] }}
       has-backends-multiarch: ${{ steps.set-matrix.outputs['has-backends-multiarch'] }}
       has-backends-darwin: ${{ steps.set-matrix.outputs['has-backends-darwin'] }}
-      has-merges: ${{ steps.set-matrix.outputs['has-merges'] }}
+      has-merges-multiarch: ${{ steps.set-matrix.outputs['has-merges-multiarch'] }}
+      has-merges-singlearch: ${{ steps.set-matrix.outputs['has-merges-singlearch'] }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -138,15 +140,21 @@ jobs:
       max-parallel: 8
       matrix: ${{ fromJson(needs.generate-matrix.outputs['matrix-singlearch']) }}
 
-  # Merge per-arch digests into manifest lists. Depends ONLY on
-  # backend-jobs-multiarch — single-arch builds are independent and slow.
-  # Without this split, a 6h CUDA-12 single-arch job would gate the merge,
-  # leaving multi-arch digests untagged on quay long enough for quay's
-  # garbage collector to reap them and the merge step to fail with
-  # "manifest not found".
-  backend-merge-jobs:
+  # Apply tags to per-arch digests via `imagetools create`. Split into two
+  # jobs that mirror the build split so each merge waits ONLY on its
+  # corresponding build matrix:
+  #
+  #   - backend-merge-jobs-multiarch  needs backend-jobs-multiarch  (~2-3h)
+  #   - backend-merge-jobs-singlearch needs backend-jobs-singlearch (up to ~6h)
+  #
+  # If a single shared merge job depended on both, slow CUDA singlearch
+  # builds would block multiarch merges long enough for quay's GC to reap
+  # the multiarch per-arch digests (the bug fixed by PR #9746). Singletons
+  # also need a merge step because backend_build.yml pushes by canonical
+  # digest only — no tags are applied at build time.
+  backend-merge-jobs-multiarch:
     needs: [generate-matrix, backend-jobs-multiarch]
-    if: needs.generate-matrix.outputs['has-merges'] == 'true'
+    if: needs.generate-matrix.outputs['has-merges-multiarch'] == 'true'
     uses: ./.github/workflows/backend_merge.yml
     with:
       tag-latest: ${{ matrix.tag-latest }}
@@ -158,7 +166,23 @@ jobs:
       quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.generate-matrix.outputs['merge-matrix']) }}
+      matrix: ${{ fromJson(needs.generate-matrix.outputs['merge-matrix-multiarch']) }}
+
+  backend-merge-jobs-singlearch:
+    needs: [generate-matrix, backend-jobs-singlearch]
+    if: needs.generate-matrix.outputs['has-merges-singlearch'] == 'true'
+    uses: ./.github/workflows/backend_merge.yml
+    with:
+      tag-latest: ${{ matrix.tag-latest }}
+      tag-suffix: ${{ matrix.tag-suffix }}
+    secrets:
+      dockerUsername: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerPassword: ${{ secrets.DOCKERHUB_PASSWORD }}
+      quayUsername: ${{ secrets.LOCALAI_REGISTRY_USERNAME }}
+      quayPassword: ${{ secrets.LOCALAI_REGISTRY_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs['merge-matrix-singlearch']) }}
 
   backend-jobs-darwin:
     needs: generate-matrix
