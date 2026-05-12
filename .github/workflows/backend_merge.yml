@@ -34,6 +34,15 @@ jobs:
     env:
       quay_username: ${{ secrets.quayUsername }}
     steps:
+      # Sparse checkout: the merge job needs `.github/scripts/` (for the
+      # keepalive cleanup script) but none of the source tree.
+      - name: Checkout (.github/scripts only)
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .github/scripts
+          sparse-checkout-cone-mode: false
+
       # `--` separator anchors the glob so we don't over-match sibling
       # backends whose tag-suffix happens to be a prefix of ours
       # (e.g. -cpu-vllm vs -cpu-vllm-omni). Must stay in sync with the
@@ -125,6 +134,15 @@ jobs:
           if [ -n "$first_tag" ] && [ "$first_tag" != "null" ]; then
             docker buildx imagetools inspect "$first_tag"
           fi
+
+      # See .github/scripts/cleanup-keepalive-tags.sh for why this is
+      # best-effort and what the failure modes are.
+      - name: Cleanup keepalive tags in ci-cache
+        if: github.event_name != 'pull_request' && success()
+        env:
+          TAG_SUFFIX: ${{ inputs.tag-suffix }}
+          QUAY_TOKEN: ${{ secrets.quayPassword }}
+        run: .github/scripts/cleanup-keepalive-tags.sh
 
       - name: Job summary
         if: github.event_name != 'pull_request'

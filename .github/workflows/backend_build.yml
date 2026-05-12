@@ -228,6 +228,16 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
+      # See .github/scripts/anchor-digest-in-cache.sh for why this is needed
+      # and how it interacts with backend_merge.yml's cleanup step.
+      - name: Anchor digest in ci-cache so quay GC won't reap before merge
+        if: github.event_name != 'pull_request'
+        env:
+          TAG_SUFFIX: ${{ inputs.tag-suffix }}
+          PLATFORM_TAG: ${{ inputs.platform-tag || 'single' }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: .github/scripts/anchor-digest-in-cache.sh
+
       # Artifact name uses a `--` separator between tag-suffix and platform-tag
       # to avoid prefix collisions during the merge job's pattern-based download.
       # Tag-suffixes are not prefix-disjoint (e.g. -gpu-nvidia-cuda-12-vllm is a
