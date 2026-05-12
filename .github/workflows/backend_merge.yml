@@ -88,6 +88,25 @@ jobs:
             latest=${{ inputs.tag-latest }}
             suffix=${{ inputs.tag-suffix }},onlatest=true
 
+      # Source from ci-cache, not local-ai-backends.
+      #
+      # The build job pushes per-arch manifests to local-ai-backends with
+      # push-by-digest=true (no tag), then anchors a tagged copy into
+      # ci-cache so the manifest can be retrieved hours later when this
+      # merge runs. Quay's manifest GC, however, is per-repository: the
+      # anchor tag in ci-cache protects the manifest there, but the same
+      # digest in local-ai-backends has no tag in *that* repo and gets
+      # reaped independently. Sourcing local-ai-backends@<digest> here
+      # then fails with "manifest not found" — exactly the regression
+      # we hit on v4.2.2 (19/37 multiarch merges failed).
+      #
+      # ci-cache@<digest> resolves because we anchored it there. buildx
+      # imagetools create copies the manifest into local-ai-backends
+      # (cross-repo within the same registry, blobs already cross-mounted
+      # from the original push so no transfer needed) and publishes the
+      # manifest list with the user-facing tags. The resulting manifest
+      # list is fully self-contained in local-ai-backends — child digests
+      # only, no embedded references to ci-cache.
       - name: Create manifest list and push (quay)
         if: github.event_name != 'pull_request'
         working-directory: /tmp/digests
@@ -104,7 +123,7 @@ jobs:
           else
             # shellcheck disable=SC2086
             docker buildx imagetools create $tags \
-              $(printf 'quay.io/go-skynet/local-ai-backends@sha256:%s ' *)
+              $(printf 'quay.io/go-skynet/ci-cache@sha256:%s ' *)
           fi
 
       - name: Create manifest list and push (dockerhub)
