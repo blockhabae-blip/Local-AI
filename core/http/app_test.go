@@ -446,6 +446,42 @@ var _ = Describe("API test", func() {
 				Expect(sc).To(Equal(200), "status code")
 				Expect(string(body)).To(ContainSubstring(`<base href="https://example.org/myprefix/" />`), "body")
 			})
+
+			// Caddy's `handle_path` (and similar directives) strip the matched
+			// prefix before forwarding upstream, so LocalAI receives the
+			// already-stripped path together with X-Forwarded-Prefix. The base
+			// href and asset URLs must still include the prefix so the browser
+			// requests them through the proxy.
+			It("Should support reverse-proxy when prefix is stripped by the proxy", func() {
+
+				err, sc, body := getRequest("http://127.0.0.1:9090/app", http.Header{
+					"X-Forwarded-Proto":  {"https"},
+					"X-Forwarded-Host":   {"example.org"},
+					"X-Forwarded-Prefix": {"/myprefix"},
+				})
+				Expect(err).To(BeNil(), "error")
+				Expect(sc).To(Equal(200), "status code")
+				Expect(string(body)).To(ContainSubstring(`<base href="https://example.org/myprefix/" />`), "body")
+				Expect(string(body)).ToNot(ContainSubstring(`="/assets/`), "asset URLs must include the prefix")
+				Expect(string(body)).ToNot(ContainSubstring(`="/favicon.svg"`), "favicon URL must include the prefix")
+			})
+
+			// X-Forwarded-Prefix is attacker controllable on misconfigured
+			// proxy chains. A value like "//evil.com" would otherwise turn the
+			// asset URL rewrite into a protocol-relative URL that loads JS
+			// from a foreign origin. BasePathPrefix must reject these via
+			// SafeForwardedPrefix and fall back to "/".
+			It("Should ignore an unsafe X-Forwarded-Prefix and not poison asset URLs", func() {
+				err, sc, body := getRequest("http://127.0.0.1:9090/app", http.Header{
+					"X-Forwarded-Proto":  {"https"},
+					"X-Forwarded-Host":   {"example.org"},
+					"X-Forwarded-Prefix": {"//evil.com"},
+				})
+				Expect(err).To(BeNil(), "error")
+				Expect(sc).To(Equal(200), "status code")
+				Expect(string(body)).ToNot(ContainSubstring("evil.com"), "unsafe prefix must not leak into the response")
+				Expect(string(body)).ToNot(ContainSubstring(`="//`), "asset URLs must not become protocol-relative")
+			})
 		})
 
 		Context("Applying models", func() {

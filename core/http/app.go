@@ -443,6 +443,25 @@ func API(application *application.Application) (*echo.Echo, error) {
 					baseTag := `<base href="` + httpMiddleware.SecureBaseHref(baseURL) + `" />`
 					indexHTML = []byte(strings.Replace(string(indexHTML), "<head>", "<head>\n  "+baseTag, 1))
 				}
+				// <base href> only changes how relative URLs resolve; path-absolute
+				// URLs (those starting with `/`) still resolve against the origin
+				// and would bypass the reverse-proxy prefix. Rewrite the internal
+				// path-absolute references emitted by the build so the browser
+				// requests them through the proxy under the prefix.
+				//
+				// HTML-escape the prefix before interpolating it into attributes:
+				// BasePathPrefix already gates X-Forwarded-Prefix via
+				// SafeForwardedPrefix, but the validator only blocks open-redirect
+				// shapes (// prefix, backslashes, control chars), not attribute
+				// breakout characters like `"`. Escaping makes this resilient
+				// even if the validator ever loosens.
+				if prefix := httpMiddleware.BasePathPrefix(c); prefix != "/" {
+					safePrefix := httpMiddleware.SecureBaseHref(prefix)
+					html := string(indexHTML)
+					html = strings.ReplaceAll(html, `="/assets/`, `="`+safePrefix+`assets/`)
+					html = strings.ReplaceAll(html, `="/favicon.svg"`, `="`+safePrefix+`favicon.svg"`)
+					indexHTML = []byte(html)
+				}
 				return c.HTMLBlob(http.StatusOK, indexHTML)
 			}
 
