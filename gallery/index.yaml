@@ -188,6 +188,81 @@
     - filename: Supra2-100M-SFT-F16.gguf
       uri: huggingface://SupraLabs/Supra2-100M-Instruct/Supra2-100M-SFT-F16.gguf
       sha256: f88228c3dcc13b5ee2333cbb6fc2416de908e5b8adabd39bf9ee4378f28451eb
+- &llm-jp-4-33b-thinking
+  name: "llm-jp-4-33b-thinking-q4"
+  variants:
+    - model: llm-jp-4-33b-thinking-bf16
+  url: "github:mudler/LocalAI/gallery/virtual.yaml@master"
+  urls:
+    - https://huggingface.co/llm-jp/llm-jp-4-33b-thinking
+    - https://huggingface.co/llm-jp/llm-jp-4-33b-thinking-gguf
+  description: |
+    LLM-jp-4-33B-thinking is an Apache-2.0 Japanese and English reasoning
+    model from Japan's National Institute of Informatics. Its dense Llama
+    architecture has 33 billion parameters and a 65K-token context window.
+    The model was aligned with supervised fine-tuning and DPO for multi-turn
+    conversation and instruction following.
+
+    This default entry uses the 20.2 GB Q4_K_M GGUF. The official 66.4 GB
+    BF16 weights are available as a higher-fidelity variant.
+  license: "apache-2.0"
+  tags:
+    - llm
+    - gguf
+    - cpu
+    - gpu
+    - multilingual
+    - japanese
+    - reasoning
+    - thinking
+    - tools
+    - long-context
+  last_checked: "2026-08-23"
+  overrides:
+    backend: llama-cpp
+    context_size: 65536
+    function:
+      automatic_tool_parsing_fallback: true
+      grammar:
+        disable: true
+    known_usecases:
+      - chat
+    options:
+      - use_jinja:true
+    parameters:
+      model: llama-cpp/models/llm-jp-4-33b-thinking/llm-jp-4-33b-thinking-Q4_K_M.gguf
+    template:
+      use_tokenizer_template: true
+  files:
+    - filename: llama-cpp/models/llm-jp-4-33b-thinking/llm-jp-4-33b-thinking-Q4_K_M.gguf
+      uri: huggingface://llm-jp/llm-jp-4-33b-thinking-gguf/llm-jp-4-33b-thinking-Q4_K_M.gguf
+      sha256: 9e48892c0d5ec256d05fc3258c9e50738852c39636fbb9fe1f4b1cde2f5e7520
+- !!merge <<: *llm-jp-4-33b-thinking
+  name: "llm-jp-4-33b-thinking-bf16"
+  variants: []
+  description: |
+    LLM-jp-4-33B-thinking in the official 66.4 GB BF16 GGUF format. This
+    variant preserves the original model precision for hosts with enough
+    memory.
+  overrides:
+    backend: llama-cpp
+    context_size: 65536
+    function:
+      automatic_tool_parsing_fallback: true
+      grammar:
+        disable: true
+    known_usecases:
+      - chat
+    options:
+      - use_jinja:true
+    parameters:
+      model: llama-cpp/models/llm-jp-4-33b-thinking/llm-jp-4-33b-thinking-BF16.gguf
+    template:
+      use_tokenizer_template: true
+  files:
+    - filename: llama-cpp/models/llm-jp-4-33b-thinking/llm-jp-4-33b-thinking-BF16.gguf
+      uri: huggingface://llm-jp/llm-jp-4-33b-thinking-gguf/llm-jp-4-33b-thinking-BF16.gguf
+      sha256: 7bb8465702b5c4a5d94e03e62921d5917181a2eda56da31edfdcd47fab2e9964
 - &qwen3-8-flash-next
   name: "qwen3.8-flash-next-q4"
   variants:
