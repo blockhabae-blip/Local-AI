@@ -49,7 +49,7 @@ jobs:
           submodules: true
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           # Track go.mod rather than a literal. Pinned at 1.22 this installed a
           # toolchain older than the module's `go 1.26.0`, so the `go run` below
