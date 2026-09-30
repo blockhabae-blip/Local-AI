@@ -32,7 +32,7 @@ jobs:
       # every run, and its tool-cache:true wipe also forced setup-go and
       # setup-node to re-download toolchains that ship preinstalled.
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
           cache: false
@@ -104,7 +104,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
           cache: false
