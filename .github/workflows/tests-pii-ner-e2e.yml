@@ -95,7 +95,7 @@ jobs:
       - name: Setup tmate session if tests fail
         if: ${{ failure() && contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
         timeout-minutes: 30
-        uses: mxschmitt/action-tmate@v3.23
+        uses: mxschmitt/action-tmate@v3.24
         with:
           detached: true
           connect-timeout-seconds: 180
